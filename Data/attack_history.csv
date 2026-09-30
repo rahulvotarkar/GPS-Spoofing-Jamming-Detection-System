@@ -1,0 +1,2 @@
+id,victim_device,attacker_ip,type,pre_lat,pre_lon,post_lat,post_lon,start_time,end_time,duration,mitigation_status
+1,device_B,192.168.56.1,SPOOFING,22.33875,73.41384,22.33875,73.41384,2026-09-29 17:29:23,2026-09-29 17:29:35,Mitigated,Mitigated (Quarantined)

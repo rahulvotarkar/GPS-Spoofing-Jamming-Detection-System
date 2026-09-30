@@ -1,0 +1,12 @@
+GPS Spoofing Detection -- Evaluation Report
+==================================================
+Dataset: labeled_dataset.csv
+Rows evaluated (device_B, NORMAL/SPOOFING only): 53
+
+TP=16  FN=0  FP=1  TN=36
+Accuracy:  98.11%
+Precision: 94.12%
+Recall:    100.00%
+F1 score:  96.97%
+
+Jamming windows flagged: 3/3

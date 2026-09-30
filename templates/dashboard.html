@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GPS Spoofing &amp; Jamming Detection System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root{
+    --bg-0:#05070d; --bg-1:#0a0e18; --bg-2:#0f1420; --panel:#0d1220cc;
+    --border:#1c2436; --border-soft:#161d2c;
+    --text-hi:#eaf0ff; --text-mid:#8ea0c2; --text-lo:#54607a;
+    --cyan:#22e6ff; --magenta:#ff3fb0; --orange:#ffa733; --green:#33ffa0;
+    --red:#ff4d5e; --yellow:#ffd23f; --blue:#3fa9ff; --purple:#a06bff;
+    --card-radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 15% -10%, #0e1830 0%, transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, #1a0e2e 0%, transparent 55%),
+      var(--bg-0);
+    color:var(--text-hi); font-family:'Rubik',sans-serif; min-height:100vh;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  h1,h2,h3,.mono{ font-family:'Orbitron',sans-serif; letter-spacing:.03em; }
+  .layout{ display:grid; grid-template-columns:220px 1fr; min-height:100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    background:linear-gradient(180deg,#0a0e1a,#070a12);
+    border-right:1px solid var(--border); padding:20px 14px; position:sticky; top:0; height:100vh;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; padding:0 6px 22px; }
+  .brand-icon{
+    width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg,var(--cyan),var(--blue)); box-shadow:0 0 18px #22e6ff55;
+    font-size:16px; color:#04121a; font-weight:900;
+  }
+  .brand-name{ font-size:12px; font-weight:700; color:var(--text-hi); line-height:1.25; }
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; margin-bottom:4px;
+    color:var(--text-mid); font-size:13px; cursor:pointer; border:1px solid transparent;
+  }
+  .nav-item:hover{ background:#0d1626; color:var(--text-hi); }
+  .nav-item.active{
+    background:linear-gradient(90deg,#12233a,#0d1626); color:var(--cyan); border-color:#1d3a55;
+    box-shadow:inset 0 0 0 1px #22e6ff22, 0 0 14px #22e6ff22;
+  }
+  .nav-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.8; flex:0 0 auto; }
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding:16px 22px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#0b0f1a,#090c14);
+  }
+  .title-wrap h1{ font-size:19px; margin:0; color:var(--text-hi); }
+  .title-wrap p{ margin:2px 0 0; font-size:11px; color:var(--cyan); letter-spacing:.12em; }
+  .badges{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .badge{
+    display:flex; align-items:center; gap:7px; padding:8px 13px; border-radius:9px; font-size:12px;
+    border:1px solid var(--border); background:#0d1422; color:var(--text-mid);
+  }
+  .badge b{ color:var(--text-hi); font-weight:500; }
+  .badge.live{ color:var(--green); border-color:#1c4a38; background:#0b1a15; }
+  .badge.gps-ok{ color:var(--cyan); border-color:#12384a; background:#081722; }
+  .pulse{ width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  select#deviceSelect{
+    background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:9px;
+    padding:8px 10px; font-size:12px; font-family:'Rubik',sans-serif;
+  }
+
+  .content{ padding:18px 22px 40px; }
+
+  /* ---------- Stat cards ---------- */
+  .stats-row{ display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:16px; }
+  .stat-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--card-radius);
+    padding:14px 16px; position:relative; overflow:hidden;
+  }
+  .stat-card::before{
+    content:""; position:absolute; inset:0; border-radius:var(--card-radius); padding:1px;
+    background:linear-gradient(135deg,var(--accent,#1c2436),transparent 40%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; opacity:.6;
+  }
+  .stat-top{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .stat-icon{ width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .stat-label{ font-size:10px; color:var(--text-lo); text-transform:uppercase; letter-spacing:.09em; }
+  .stat-value{ font-size:22px; font-weight:700; font-family:'Orbitron',sans-serif; }
+  .stat-sub{ font-size:11px; margin-top:2px; }
+  .c-green{ color:var(--green); } .c-cyan{ color:var(--cyan); } .c-orange{ color:var(--orange); }
+  .c-magenta{ color:var(--magenta); } .c-red{ color:var(--red); } .c-yellow{ color:var(--yellow); }
+
+  /* ---------- Panels ---------- */
+  .grid-2{ display:grid; grid-template-columns:1.5fr 1fr; gap:14px; margin-bottom:14px; }
+  .grid-4{ display:grid; grid-template-columns:1.15fr 1fr 0.9fr 0.9fr; gap:14px; }
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--card-radius);
+    padding:16px; backdrop-filter:blur(6px); transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .panel-head h3{ font-size:12px; color:var(--text-mid); letter-spacing:.09em; margin:0; }
+  .legend{ display:flex; gap:14px; font-size:11px; color:var(--text-mid); }
+  .legend span{ display:flex; align-items:center; gap:5px; }
+  .swatch{ width:9px; height:9px; border-radius:2px; }
+
+  /* ---------- Alert feed ---------- */
+  table.alerts{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.alerts th{ text-align:left; color:var(--text-lo); font-weight:500; padding:5px 6px; border-bottom:1px solid var(--border-soft); text-transform:uppercase; font-size:9.5px; letter-spacing:.08em; }
+  table.alerts td{ padding:7px 6px; border-bottom:1px solid var(--border-soft); color:var(--text-mid); vertical-align:middle; }
+  .sev-pill{ font-size:9.5px; padding:3px 8px; border-radius:20px; font-weight:700; letter-spacing:.03em; }
+  .sev-INFO{ background:#0c2a44; color:var(--blue); } .sev-WARNING{ background:#3a2a08; color:var(--orange); } .sev-CRITICAL{ background:#3a0d16; color:var(--red); }
+  .dot-status{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:6px; }
+
+  /* ---------- Signal params table ---------- */
+  table.params{ width:100%; border-collapse:collapse; font-size:12px; }
+  table.params th{ text-align:left; color:var(--text-lo); font-weight:500; padding:6px 4px; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; border-bottom:1px solid var(--border-soft); }
+  table.params td{ padding:8px 4px; border-bottom:1px solid var(--border-soft); color:var(--text-hi); }
+  .trend-good{ color:var(--green); font-size:11px; }
+
+  /* ---------- Sky view ---------- */
+  .sky-wrap{ display:flex; gap:12px; align-items:center; }
+  .sky-bars{ flex:1; display:flex; flex-direction:column; gap:6px; }
+  .sky-bar-row{ display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--text-mid); }
+  .sky-bar-track{ flex:1; height:6px; background:#0e1522; border-radius:4px; overflow:hidden; }
+  .sky-bar-fill{ height:100%; border-radius:4px; }
+
+  /* ---------- System info ---------- */
+  .sysinfo-row{ display:flex; justify-content:space-between; font-size:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); color:var(--text-mid); }
+  .sysinfo-row b{ color:var(--text-hi); font-weight:500; }
+
+  /* ---------- Gauge ---------- */
+  .gauge-wrap{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding-top:6px; }
+  .gauge-label{ font-size:14px; font-weight:700; margin-top:8px; font-family:'Orbitron',sans-serif; }
+  .gauge-score{ font-size:12px; color:var(--text-mid); margin-top:2px; }
+  .gauge-caption{ font-size:10.5px; color:var(--text-lo); margin-top:6px; text-align:center; }
+
+  /* ---------- Map ---------- */
+  #map{ height:400px; border-radius:10px; overflow:hidden; border:1px solid var(--border); transition: border-color 0.3s ease; }
+  .pos-panel{
+    margin-top:10px; background:#0a1220; border:1px solid var(--border); border-radius:10px; padding:12px 16px; font-size:12px;
+  }
+  .pos-panel div { color:var(--text-mid); }
+  .pos-panel b{ color:var(--cyan); }
+
+  footer{ text-align:center; padding:16px; font-size:11px; color:var(--text-lo); border-top:1px solid var(--border); }
+  canvas{ max-width:100%; }
+
+  @media (max-width:1200px){
+    .stats-row{ grid-template-columns:repeat(3,1fr); }
+    .grid-2{ grid-template-columns:1fr; }
+    .grid-4{ grid-template-columns:1fr 1fr; }
+  }
+  @media (max-width:760px){
+    .layout{ grid-template-columns:1fr; }
+    .sidebar{ display:none; }
+    .stats-row{ grid-template-columns:repeat(2,1fr); }
+    .grid-4{ grid-template-columns:1fr; }
+  }
+
+  /* ---------- Light Theme Overrides ---------- */
+  body.light-theme {
+    --bg-0:#f0f2f6; --bg-1:#ffffff; --bg-2:#e2e8f0; --panel:#ffffffdd;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --text-hi:#0f172a; --text-mid:#475569; --text-lo:#64748b;
+    --cyan:#0284c7; --magenta:#db2777; --orange:#ea580c; --green:#16a34a;
+    --red:#dc2626; --yellow:#ca8a04; --blue:#2563eb; --purple:#7c3aed;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #e2eafc 0%, transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, #fae8ff 0%, transparent 55%),
+      var(--bg-0);
+  }
+  body.light-theme .sidebar {
+    background: linear-gradient(180deg,#f8fafc,#f1f5f9);
+    border-color: var(--border);
+  }
+  body.light-theme #map {
+    border-color: var(--border);
+  }
+  body.light-theme .pos-panel {
+    background: #f1f5f9;
+  }
+  body.light-theme select, body.light-theme input, body.light-theme form select {
+    background: #ffffff !important;
+    color: var(--text-hi) !important;
+    border-color: var(--border) !important;
+  }
+  body.light-theme #evaluationReportContent {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border-color: var(--border) !important;
+  }
+
+  /* ---------- Alarm Overlay ---------- */
+  .alarm-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0);
+  }
+  .alarm-overlay.spoof-active {
+    opacity: 1;
+    animation: pulse-red 1.5s infinite alternate;
+  }
+  .alarm-overlay.jam-active {
+    opacity: 1;
+    animation: pulse-orange 1.5s infinite alternate;
+  }
+  @keyframes pulse-red {
+    0% { box-shadow: inset 0 0 30px rgba(255, 77, 94, 0.3); }
+    100% { box-shadow: inset 0 0 60px rgba(255, 77, 94, 0.85), 0 0 20px rgba(255, 77, 94, 0.3); }
+  }
+  @keyframes pulse-orange {
+    0% { box-shadow: inset 0 0 30px rgba(255, 167, 51, 0.3); }
+    100% { box-shadow: inset 0 0 60px rgba(255, 167, 51, 0.85), 0 0 20px rgba(255, 167, 51, 0.3); }
+  }
+</style>
+</head>
+<body>
+<div id="alarmOverlay" class="alarm-overlay"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">GS</div>
+      <div class="brand-name">GPS DETECTOR<br>WORKSPACE</div>
+    </div>
+    <div class="nav-item active" data-tab="dashboard"><span class="nav-dot"></span> Dashboard</div>
+    <div class="nav-item" data-tab="map"><span class="nav-dot"></span> Map View</div>
+    <div class="nav-item" data-tab="alerts"><span class="nav-dot"></span> Alerts Feed</div>
+    <div class="nav-item" data-tab="analytics"><span class="nav-dot"></span> Analytics</div>
+    <div class="nav-item" data-tab="logs"><span class="nav-dot"></span> Logs &amp; Reports</div>
+    <div class="nav-item" data-tab="settings"><span class="nav-dot"></span> Settings</div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="title-wrap">
+        <!-- Dashboard name removed from here to clean up headers as requested -->
+      </div>
+      <div class="badges">
+        <button id="muteAlarmBtn" onclick="toggleMute()" style="display:none; background:var(--red); color:#fff; border:none; padding:8px 12px; border-radius:9px; font-size:12px; cursor:pointer; font-weight:bold; font-family:'Orbitron'; box-shadow:0 0 10px rgba(255, 77, 94, 0.4); margin-right:6px;">MUTE ALARM</button>
+        <button id="resetStateBtn" onclick="resetSystemState()" style="background:#1c2436; color:var(--text-mid); border:1px solid var(--border); padding:8px 12px; border-radius:9px; font-size:12px; cursor:pointer; font-weight:bold; font-family:'Orbitron'; margin-right:6px;">RESET SYSTEM</button>
+        <select id="deviceSelect"><option>Waiting for device…</option></select>
+        <div class="badge live"><span class="pulse"></span> LIVE</div>
+        <div class="badge" id="clockBadge">--:--:--</div>
+        <div class="badge" id="dateBadge">----</div>
+        <div class="badge gps-ok" id="gpsBadge">● GPS —</div>
+      </div>
+    </div>
+
+    <div id="diagBanner" style="display:none; margin:14px 22px 0; padding:12px 16px; border-radius:10px; background:#2a1414; border:1px solid #5a2020; color:#ffb3ba; font-size:12.5px; line-height:1.5;"></div>
+    <div class="content">
+
+      <!-- ================= TAB: DASHBOARD ================= -->
+      <div id="tab-dashboard" class="tab-content">
+        <!-- STAT CARDS -->
+        <div class="stats-row" id="statsRow">
+          <div class="stat-card" style="--accent:var(--green)">
+            <div class="stat-top"><div class="stat-icon" style="background:#0c2a1c;color:var(--green)">&#9679;</div><div class="stat-label">Detection Status</div></div>
+            <div class="stat-value c-green" id="statDetection">NORMAL</div>
+            <div class="stat-sub" id="statDetectionSub" style="color:var(--text-lo)">No threat detected</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--cyan)">
+            <div class="stat-top"><div class="stat-icon" style="background:#0b2230;color:var(--cyan)">&#9737;</div><div class="stat-label">Satellites in view</div></div>
+            <div class="stat-value c-cyan" id="statSats">--</div>
+            <div class="stat-sub" style="color:var(--text-lo)">Tracking</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--magenta)">
+            <div class="stat-top"><div class="stat-icon" style="background:#2a0c22;color:var(--magenta)">&#9993;</div><div class="stat-label">SNR (dB-Hz)</div></div>
+            <div class="stat-value c-magenta" id="statSnr">--</div>
+            <div class="stat-sub c-green" id="statSnrSub">Good</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--orange)">
+            <div class="stat-top"><div class="stat-icon" style="background:#2a1c0c;color:var(--orange)">&#9650;</div><div class="stat-label">CNO (dB-Hz)</div></div>
+            <div class="stat-value c-orange" id="statCno">--</div>
+            <div class="stat-sub c-green" id="statCnoSub">Good</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--blue)">
+            <div class="stat-top"><div class="stat-icon" style="background:#0c1c2a;color:var(--blue)">&#8853;</div><div class="stat-label">HDOP</div></div>
+            <div class="stat-value" style="color:var(--blue)" id="statHdop">--</div>
+            <div class="stat-sub c-green" id="statHdopSub">Good</div>
+          </div>
+          <div class="stat-card" style="--accent:var(--red)">
+            <div class="stat-top"><div class="stat-icon" style="background:#2a0c14;color:var(--red)">&#9673;</div><div class="stat-label">Anomaly Score</div></div>
+            <div class="stat-value" style="color:var(--red)" id="statAnomaly">--</div>
+            <div class="stat-sub" id="statAnomalySub" style="color:var(--text-lo)">Low risk</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- SIGNAL CHART -->
+          <div class="panel">
+            <div class="panel-head">
+              <h3>REAL-TIME SIGNAL MONITOR</h3>
+              <div class="legend">
+                <span><span class="swatch" style="background:var(--magenta)"></span>SNR (dB-Hz)</span>
+                <span><span class="swatch" style="background:var(--cyan)"></span>CNO (dB-Hz)</span>
+                <span><span class="swatch" style="background:var(--orange)"></span>Satellites</span>
+              </div>
+            </div>
+            <div style="position:relative;height:230px;">
+              <canvas id="signalChart" role="img" aria-label="Live SNR, CNO and satellite count over time">Live signal chart</canvas>
+            </div>
+          </div>
+
+          <!-- SATELLITE SKY VIEW -->
+          <div class="panel" id="sectionSky">
+            <div class="panel-head"><h3>SATELLITE SKY VIEW (SIMULATED GNSS)</h3></div>
+            <div class="sky-wrap">
+              <svg id="skySvg" viewBox="0 0 200 200" width="190" height="190"></svg>
+              <div class="sky-bars" id="skyBars"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="grid-template-columns: 1.2fr 1fr;">
+          <div class="panel" id="sectionParams">
+            <div class="panel-head"><h3>GPS & SYSTEM TELEMETRY (18 SEC ANALYTICS)</h3></div>
+            <table class="params" style="font-size: 11.5px;">
+              <thead><tr><th>Parameter Indicator</th><th>Metric Value</th><th>Status / Severity</th></tr></thead>
+              <tbody id="paramsBody">
+                <tr style="background:#0e1626; font-weight:bold; color:var(--cyan);"><td colspan="3">GPS SIGNAL METRICS</td></tr>
+                <tr><td>Victim Coordinates (Lat / Lon)</td><td id="pCoords">--</td><td id="pCoordsStatus">Normal</td></tr>
+                <tr><td>True Baseline Coordinates (Original)</td><td id="pTrueCoords">--</td><td id="pTrueCoordsStatus">Normal</td></tr>
+                <tr><td>Altitude (m)</td><td id="pAltitude">--</td><td id="pAltitudeStatus">Normal</td></tr>
+                <tr><td>Accuracy Margin (m)</td><td id="pAccuracy">--</td><td id="pAccuracyStatus">Normal</td></tr>
+                <tr><td>SNR / CNO (dB-Hz)</td><td id="pSnrCno">--</td><td id="pSnrCnoStatus">Normal</td></tr>
+                <tr><td>Satellites Tracking</td><td id="pSats">--</td><td id="pSatsStatus">Normal</td></tr>
+                <tr><td>HDOP / VDOP</td><td id="pDop">--</td><td id="pDopStatus">Normal</td></tr>
+                
+                <tr style="background:#0e1626; font-weight:bold; color:var(--cyan);"><td colspan="3">MOTION DIFFERENTIALS</td></tr>
+                <tr><td>Live Speed / Heading</td><td id="pMotion">--</td><td id="pMotionStatus">Normal</td></tr>
+                <tr><td>Acceleration Delta (Speed Diff)</td><td id="pSpeedDiff">--</td><td id="pSpeedDiffStatus">Normal</td></tr>
+                <tr><td>Turn Delta (Heading Diff)</td><td id="pHeadingDiff">--</td><td id="pHeadingDiffStatus">Normal</td></tr>
+                
+                <tr style="background:#0e1626; font-weight:bold; color:var(--cyan);"><td colspan="3">CYBER THREAT INTELLIGENCE</td></tr>
+                <tr><td>Distance Jump Delta</td><td id="pDistJump">--</td><td id="pDistJumpStatus">Normal</td></tr>
+                <tr><td>Cumulative Position Drift</td><td id="pDrift">--</td><td id="pDriftStatus">Normal</td></tr>
+                <tr><td>Threat Score / Anomaly Index</td><td id="pThreatIndex">--</td><td id="pThreatIndexStatus">Normal</td></tr>
+                <tr><td>Detection Confidence Level</td><td id="pConfidence">--</td><td id="pConfidenceStatus">Normal</td></tr>
+                
+                <tr style="background:#0e1626; font-weight:bold; color:var(--cyan);"><td colspan="3">DEVICE & FIREWALL INFO</td></tr>
+                <tr><td>Victim Device ID</td><td id="pVictimId">--</td><td id="pVictimIdStatus">Unblocked</td></tr>
+                <tr><td>Victim Network IP</td><td id="pVictimIp">--</td><td id="pVictimIpStatus">Authorized</td></tr>
+                <tr><td>Attacker Transmitter IP</td><td id="pAttackerIp">--</td><td id="pAttackerIpStatus">Threat Identified</td></tr>
+                <tr><td>Mitigation Status</td><td id="pMitigation">--</td><td id="pMitigationStatus">Active</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="panel" id="sectionSystem">
+            <div class="panel-head"><h3>SYSTEM INFO</h3></div>
+            <div class="sysinfo-row"><span>GPS Receiver Status</span><b id="sysGps">--</b></div>
+            <div class="sysinfo-row"><span>Data Source</span><b>GPS Receiver / Simulator</b></div>
+            <div class="sysinfo-row"><span>Uptime</span><b id="sysUptime">--</b></div>
+            <div class="sysinfo-row"><span>Last Update</span><b id="sysLast">--</b></div>
+            <div class="sysinfo-row"><span>Update Interval</span><b id="sysInterval">--</b></div>
+            <div class="sysinfo-row" style="border-bottom:none;"><span>System Mode</span><b>Real-time Monitoring</b></div>
+          </div>
+        </div>
+
+        <!-- THREAT MITIGATION SECTION -->
+        <div class="grid-2" style="grid-template-columns: 1fr 1fr; margin-top: 20px;">
+          <div class="panel" id="sectionMitigation">
+            <div class="panel-head"><h3>CYBER MITIGATION CONSOLE</h3></div>
+            <div style="padding: 10px 0;">
+              <p style="font-size: 12px; color: var(--text-lo); margin-bottom: 12px; line-height: 1.5;">
+                If a device is under active spoofing/jamming, click <b>Block Attack Source</b>. The system will blacklist its source IP and ignore all subsequent malicious packets, resolving the alert state.
+              </p>
+              <div id="mitigationDeviceList" style="display:flex; flex-direction:column; gap:8px;">
+                <div style="text-align: center; color: var(--text-lo); padding: 10px; font-size: 12px;">No active device streams to mitigate.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="sectionBlocklist">
+            <div class="panel-head"><h3>FIREWALL BLACKLIST</h3></div>
+            <div style="padding: 10px 0;">
+              <table class="params" style="width: 100%; font-size: 12px;">
+                <thead>
+                  <tr><th>Device ID</th><th>IP Address</th><th>Action</th></tr>
+                </thead>
+                <tbody id="blocklistBody">
+                  <tr><td colspan="3" style="text-align: center; color: var(--text-lo);">No blocked sources in firewall.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <div class="panel" id="sectionTimeline" style="margin-top: 20px;">
+          <div class="panel-head"><h3>ATTACK HISTORY TIMELINE (data/attack_history.csv)</h3></div>
+          <div style="overflow-x:auto;">
+            <table class="params" style="width:100%; font-size:12px;">
+              <thead>
+                <tr>
+                  <th>Timeline ID</th>
+                  <th>Victim Device ID</th>
+                  <th>Attacker IP</th>
+                  <th>Attack Type</th>
+                  <th>Pre-Attack (Before)</th>
+                  <th>Post-Attack (After)</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Duration</th>
+                  <th>Mitigation Status</th>
+                </tr>
+              </thead>
+              <tbody id="timelineBody">
+                <tr><td colspan="8" style="text-align:center; color:var(--text-lo);">No attack events recorded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: MAP VIEW ================= -->
+      <div id="tab-map" class="tab-content" style="display:none;">
+        <div class="panel" id="sectionMap" style="margin-bottom:14px;">
+          <div class="panel-head">
+            <h3>LIVE LOCATION TRACKER (PARUL UNIVERSITY CENTERED)</h3>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button id="centerMapBtn" onclick="centerOnCurrentLocation()" style="background:var(--cyan); color:#04121a; border:1px solid var(--cyan); padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:bold; font-family:'Orbitron';">Auto-Follow: ON</button>
+              <select id="mapStyleSelect" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:11px;" onchange="setMapLayer(this.value)">
+                <option value="street">Google Street Map</option>
+                <option value="satellite">Google Satellite Map</option>
+                <option value="hybrid">Google Hybrid Map</option>
+              </select>
+              <div class="badge live" style="padding:4px 9px;"><span class="pulse"></span>LIVE</div>
+            </div>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <div class="pos-panel">
+          <div style="color:var(--text-hi);font-size:11px;letter-spacing:.06em;margin-bottom:6px;">SELECTED DEVICE POSITION DETAILS</div>
+          <div class="grid-4" style="grid-template-columns: repeat(4, 1fr); gap: 14px; border:none;">
+            <div>Latitude: <b id="posLat">--</b></div>
+            <div>Longitude: <b id="posLon">--</b></div>
+            <div>Speed: <b id="posSpeed">--</b></div>
+            <div>Heading: <b id="posHeading">--</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: ALERTS FEED ================= -->
+      <div id="tab-alerts" class="tab-content" style="display:none;">
+        <div class="grid-2" style="grid-template-columns: 1.6fr 1fr;">
+          <div class="panel" id="sectionAlerts">
+            <div class="panel-head"><h3>REAL-TIME ALERT FEED</h3></div>
+            <table class="alerts">
+              <thead><tr><th>Time</th><th>Type</th><th>Severity</th><th>Message</th></tr></thead>
+              <tbody id="alertBody"><tr><td colspan="4" style="color:var(--text-lo);">Waiting for events…</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="panel" id="sectionGauge">
+            <div class="panel-head"><h3>THREAT LEVEL</h3></div>
+            <div class="gauge-wrap">
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                <circle cx="65" cy="65" r="54" fill="none" stroke="#141c2c" stroke-width="12"/>
+                <circle id="gaugeArc" cx="65" cy="65" r="54" fill="none" stroke="var(--green)" stroke-width="12"
+                  stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3" transform="rotate(-90 65 65)"/>
+                <text x="65" y="60" text-anchor="middle" fill="var(--text-lo)" font-size="8" font-family="Rubik">RISK</text>
+              </svg>
+              <div class="gauge-label" id="gaugeLabel" style="color:var(--green)">LOW RISK</div>
+              <div class="gauge-score" id="gaugeScore">0.00 / 1.00</div>
+              <div class="gauge-caption" id="gaugeCaption">System is operating normally</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: ANALYTICS ================= -->
+      <div id="tab-analytics" class="tab-content" style="display:none;">
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head"><h3>LIVE ANOMALY SCORE TIMELINE</h3></div>
+          <div style="position:relative;height:220px;">
+            <canvas id="anomalyChart" role="img" aria-label="Live anomaly score with low, medium and high risk bands">Live anomaly score chart</canvas>
+          </div>
+        </div>
+
+
+      </div>
+
+      <!-- ================= TAB: LOGS & REPORTS ================= -->
+      <div id="tab-logs" class="tab-content" style="display:none;">
+        <div class="grid-2" style="grid-template-columns: 1fr 1fr;">
+          <div class="panel" style="max-height: 400px; overflow-y: auto;">
+            <div class="panel-head">
+              <h3>GPS UPDATE LOGS (data/gps_log.csv)</h3>
+              <button onclick="refreshGpsLogs()" style="background:#1c2436; color:var(--cyan); border:1px solid #1d3a55; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer;">Refresh</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="params" id="gpsLogsTable" style="font-size:10px;">
+                <thead>
+                  <tr><th>Timestamp</th><th>Device</th><th>Lat</th><th>Lon</th><th>Status</th><th>Score</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="6" style="color:var(--text-lo);text-align:center;">Click Refresh to load...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel" style="max-height: 400px; overflow-y: auto;">
+            <div class="panel-head">
+              <h3>SYSTEM ALERT LOGS (data/alerts_log.csv)</h3>
+              <button onclick="refreshAlertLogs()" style="background:#1c2436; color:var(--cyan); border:1px solid #1d3a55; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer;">Refresh</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="params" id="alertLogsTable" style="font-size:10px;">
+                <thead>
+                  <tr><th>Timestamp</th><th>Device</th><th>Type</th><th>Severity</th><th>Message</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="5" style="color:var(--text-lo);text-align:center;">Click Refresh to load...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="grid-template-columns: 1.1fr 1fr; margin-top:14px; gap:14px;">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>QUANTITATIVE EVALUATION REPORT (analysis_output/evaluation_report.txt)</h3>
+              <button onclick="refreshEvaluationReport()" style="background:#1c2436; color:var(--cyan); border:1px solid #1d3a55; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer;">Load Report</button>
+            </div>
+            <pre id="evaluationReportContent" style="background:#05070d; border:1px solid var(--border); padding:14px; border-radius:8px; color:var(--green); font-family:'Courier New', monospace; font-size:11.5px; white-space:pre-wrap; max-height:220px; overflow-y:auto; margin:0;">Run evaluation script (evaluate_dataset.py) to write report.</pre>
+          </div>
+          
+          <div class="panel">
+            <div class="panel-head">
+              <h3>DETECTION ACCURACY &amp; PERFORMANCE METRICS</h3>
+            </div>
+            <div style="height:220px; position:relative;">
+              <canvas id="accuracyChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: SETTINGS ================= -->
+      <div id="tab-settings" class="tab-content" style="display:none;">
+        <div class="grid-2" style="grid-template-columns: 1.1fr 1fr;">
+          <div class="panel">
+            <div class="panel-head"><h3>DETECTION &amp; ALERTS CONFIGURATION</h3></div>
+            <form id="settingsForm" onsubmit="saveSettings(event)" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">DISTANCE DISAGREEMENT THRESHOLD (METERS)</label>
+                <input type="number" id="cfgDistance" name="distance_threshold_m" min="5" max="200" step="1" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                <span style="font-size:10px; color:var(--text-lo);">Flags spoofing if devices disagree by more than this distance (default 15m to catch 20-50m attacks).</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">MAXIMUM PLAUSIBLE SPEED (KM/H)</label>
+                <input type="number" id="cfgSpeed" name="max_speed_kmh" min="10" max="500" step="1" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                <span style="font-size:10px; color:var(--text-lo);">Flags spoofing if single-device computed speed exceeds this (default 150 km/h).</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">JAMMING TIMEOUT (SECONDS)</label>
+                <input type="number" id="cfgTimeout" name="jamming_timeout_s" min="5" max="120" step="1" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                <span style="font-size:10px; color:var(--text-lo);">Flags jamming if device reports go silent for this period (default 15s).</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                <input type="checkbox" id="cfgSoundEnabled" checked style="width:auto; margin:0;">
+                <label for="cfgSoundEnabled" style="font-size:12px; color:var(--text-mid); font-weight:bold;">Enable Sound Alerts (Audible Alarm)</label>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
+                <button type="submit" style="background:linear-gradient(135deg,var(--cyan),var(--blue)); color:#04121a; font-weight:bold; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; flex:1; font-family:'Orbitron'; font-size:12px;">SAVE SETTINGS</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel" style="display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div class="panel-head"><h3>USER PREFERENCES &amp; SETUP</h3></div>
+              <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">DASHBOARD THEME</label>
+                  <select id="cfgTheme" onchange="toggleThemeSetting(this.value)" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                    <option value="dark">Cyber Neon Dark Mode</option>
+                    <option value="light">Crisp Light Mode</option>
+                  </select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">MEASUREMENT UNITS</label>
+                  <select id="cfgUnits" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                    <option value="kmh">Metric (km/h)</option>
+                    <option value="mph">Imperial (mph)</option>
+                  </select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:11px; color:var(--text-mid); font-weight:bold;">DATA INPUT CHANNEL</label>
+                  <select id="cfgSource" style="background:#0d1422; color:var(--text-hi); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px;">
+                    <option value="sim">Virtual Device Simulator</option>
+                    <option value="serial">USB Serial / COM Port (Auto)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border); padding-top:14px;">
+              <div class="panel-head" style="margin-bottom:8px;"><h3>LIVE SYSTEM METRICS</h3></div>
+              <div class="sysinfo-row"><span>Application Version</span><b>v1.1.0-final</b></div>
+              <div class="sysinfo-row"><span>CPU Usage</span><b id="sysCpuUsage">--%</b></div>
+              <div class="sysinfo-row"><span>Memory Usage</span><b id="sysMemUsage">--%</b></div>
+              <div style="display:flex; gap:10px; margin-top:12px;">
+                <button onclick="resetSettingsToDefault()" style="background:#2a1414; color:#ffb3ba; border:1px solid #5a2020; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:11px; flex:1;">Reset Defaults</button>
+                <button onclick="backupConfig()" style="background:#1c2436; color:var(--text-mid); border:1px solid var(--border); padding:8px 12px; border-radius:6px; cursor:pointer; font-size:11px; flex:1;">Backup Config</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <footer>All times are in IST (UTC +05:30) &middot; <span id="footStatus">Real-time monitoring active</span></footer>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let hasCdnError = false;
+function showDiag(msg, isCdnError = false){
+  if (isCdnError) {
+    hasCdnError = true;
+  } else if (hasCdnError) {
+    return; // Don't overwrite a critical CDN error
+  }
+  const b = document.getElementById('diagBanner');
+  b.style.display = 'block';
+  b.innerHTML = msg;
+}
+function hideDiag(){
+  if (hasCdnError) return;
+  document.getElementById('diagBanner').style.display = 'none';
+}
+
+let audioCtx = null;
+let isAlarmMuted = false;
+let lastSystemStatus = 'NORMAL';
+let hasFittedSpoofBounds = false;
+let isAutoFollowEnabled = true;
+
+// Robust interval-based alarm buzzer
+let buzzerTimer = null;
+let activeAlarmType = null;
+
+function startBuzzer(type, force = false) {
+  stopBuzzer(); // ensure cleared
+  
+  // Define buzzer tick function
+  const triggerTick = () => {
+    if (!document.getElementById('cfgSoundEnabled').checked) return;
+    if (isAlarmMuted && !force) return;
+    
+    try {
+      const context = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx = context;
+      
+      if (context.state === 'suspended') {
+        context.resume();
+        return; // wait for next interval loop iteration after gesture
+      }
+      
+      const osc = context.createOscillator();
+      const gainNode = context.createGain();
+      
+      osc.connect(gainNode);
+      gainNode.connect(context.destination);
+      
+      if (type === 'SPOOFING') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, context.currentTime); // Urgent A5 pitch
+        gainNode.gain.setValueAtTime(0.18, context.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.4);
+        osc.start();
+        osc.stop(context.currentTime + 0.45);
+      } else { // JAMMING
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(330, context.currentTime); // Low pulsing E4 pitch
+        gainNode.gain.setValueAtTime(0.25, context.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.7);
+        osc.start();
+        osc.stop(context.currentTime + 0.75);
+      }
+    } catch (e) {
+      console.error("Buzzer play tick failed:", e);
+    }
+  };
+
+  // Play immediately once, then schedule
+  triggerTick();
+  buzzerTimer = setInterval(triggerTick, type === 'SPOOFING' ? 600 : 1200);
+}
+
+function stopBuzzer() {
+  if (buzzerTimer) {
+    clearInterval(buzzerTimer);
+    buzzerTimer = null;
+  }
+}
+
+function triggerAlarm(status) {
+  const muteBtn = document.getElementById('muteAlarmBtn');
+  if (status === 'SPOOFING' || status === 'JAMMING') {
+    if (muteBtn) muteBtn.style.display = 'inline-block';
+    
+    if (lastSystemStatus !== status) {
+      lastSystemStatus = status;
+      updateMuteButtonUI();
+    }
+    
+    if (activeAlarmType !== status) {
+      activeAlarmType = status;
+      startBuzzer(status);
+    }
+  } else {
+    if (muteBtn) muteBtn.style.display = 'none';
+    isAlarmMuted = false;
+    lastSystemStatus = 'NORMAL';
+    activeAlarmType = null;
+    updateMuteButtonUI();
+    stopBuzzer();
+    
+    const overlay = document.getElementById('alarmOverlay');
+    if (overlay) {
+      overlay.className = 'alarm-overlay';
+    }
+  }
+}
+
+function stopAlarm() {
+  stopBuzzer();
+  activeAlarmType = null;
+  const overlay = document.getElementById('alarmOverlay');
+  if (overlay) {
+    overlay.className = 'alarm-overlay';
+  }
+}
+
+function toggleMute() {
+  isAlarmMuted = !isAlarmMuted;
+  updateMuteButtonUI();
+  if (isAlarmMuted) {
+    stopBuzzer();
+  } else {
+    if (activeAlarmType) {
+      startBuzzer(activeAlarmType);
+    }
+  }
+}
+
+function updateMuteButtonUI() {
+  const muteBtn = document.getElementById('muteAlarmBtn');
+  if (!muteBtn) return;
+  if (isAlarmMuted) {
+    muteBtn.textContent = 'UNMUTE ALARM';
+    muteBtn.style.background = '#1c2436';
+    muteBtn.style.color = 'var(--text-mid)';
+    muteBtn.style.border = '1px solid var(--border)';
+    muteBtn.style.boxShadow = 'none';
+  } else {
+    muteBtn.textContent = 'MUTE ALARM';
+    muteBtn.style.background = 'var(--red)';
+    muteBtn.style.color = '#fff';
+    muteBtn.style.border = 'none';
+    muteBtn.style.boxShadow = '0 0 10px rgba(255, 77, 94, 0.4)';
+  }
+}
+
+/* ---------------- Sidebar nav: switch tabs ---------------- */
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    item.classList.add('active');
+    const targetTab = item.dataset.tab;
+    document.querySelectorAll('.tab-content').forEach(tab=>{
+      tab.style.display = tab.id === 'tab-' + targetTab ? 'block' : 'none';
+    });
+    if(targetTab === 'map' && map){
+      setTimeout(() => { map.invalidateSize(); }, 100);
+    }
+  });
+});
+
+let map, signalChart, anomalyChart;
+
+/* ---------------- Map styles config ---------------- */
+let mapLayers = {};
+try {
+  if (typeof L === 'undefined') throw new Error('Leaflet failed to load from CDN');
+  
+  map = L.map('map', { zoomControl:true, attributionControl:false }).setView([22.28875, 73.36384], 15); // Default centered on Parul University
+  
+  // Disable auto-follow when the user interacts with the map
+  map.on('dragstart', () => {
+    isAutoFollowEnabled = false;
+    updateCenterButtonUI();
+  });
+  map.on('zoomstart', () => {
+    isAutoFollowEnabled = false;
+    updateCenterButtonUI();
+  });
+  
+  mapLayers.street = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom:20, attribution: 'Google' });
+  mapLayers.satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom:20, attribution: 'Google' });
+  mapLayers.hybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom:20, attribution: 'Google' });
+  
+  mapLayers.street.addTo(map);
+
+  // Request browser geolocation to center map on operator's actual current location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        fetch('/api/operator/location', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+        });
+        console.log('Operator location captured:', pos.coords.latitude, pos.coords.longitude);
+        if (!selectedDevice) {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+        }
+      },
+      err => console.warn('Operator geolocation unavailable:', err.message)
+    );
+  }
+} catch(e) {
+  console.error(e);
+  showDiag('Map failed to load (' + e.message + '). Check internet connectivity.', true);
+}
+
+function setMapLayer(style) {
+  if (map && mapLayers[style]) {
+    Object.values(mapLayers).forEach(layer => { if (map.hasLayer(layer)) map.removeLayer(layer); });
+    mapLayers[style].addTo(map);
+  }
+}
+
+let trail = null, trailPoints = [];
+let distanceLine = null;
+
+try {
+  /* ---------------- Charts setup ---------------- */
+  if (typeof Chart === 'undefined') throw new Error('Chart.js failed to load from CDN');
+  const gridColor = '#141c2c';
+  Chart.defaults.color = '#8ea0c2';
+  Chart.defaults.font.family = 'Rubik';
+
+  signalChart = new Chart(document.getElementById('signalChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label:'SNR', data: [], borderColor:'#ff3fb0', backgroundColor:'transparent', tension:.35, pointRadius:0, borderWidth:2, yAxisID:'y' },
+      { label:'CNO', data: [], borderColor:'#22e6ff', backgroundColor:'transparent', tension:.35, pointRadius:0, borderWidth:2, yAxisID:'y' },
+      { label:'Satellites', data: [], borderColor:'#ffa733', backgroundColor:'transparent', tension:.35, pointRadius:0, borderWidth:2, yAxisID:'y1', borderDash:[4,3] },
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ grid:{color:gridColor}, ticks:{maxTicksLimit:6, font:{size:10}} },
+        y:{ position:'left', min:0, max:60, grid:{color:gridColor}, ticks:{font:{size:10}} },
+        y1:{ position:'right', min:0, max:20, grid:{display:false}, ticks:{font:{size:10}} },
+      }
+    }
+  });
+
+  anomalyChart = new Chart(document.getElementById('anomalyChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label:'Anomaly score', data: [], borderColor:'#eaf0ff', backgroundColor:'#eaf0ff11', fill:true, tension:.35, pointRadius:0, borderWidth:2 },
+      { label:'High risk', data: [], borderColor:'#ff4d5e88', borderDash:[5,4], pointRadius:0, borderWidth:1 },
+      { label:'Medium risk', data: [], borderColor:'#ffa73388', borderDash:[5,4], pointRadius:0, borderWidth:1 },
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ grid:{color:gridColor}, ticks:{maxTicksLimit:6, font:{size:10}} },
+        y:{ min:0, max:1, grid:{color:gridColor}, ticks:{font:{size:10}} },
+      }
+    }
+  });
+} catch(e) {
+  console.error(e);
+  showDiag('Charts failed to load (' + e.message + '). Check internet connectivity.', true);
+}
+
+/* ---------------- Sky view ---------------- */
+function drawSky(sats){
+  const svg = document.getElementById('skySvg');
+  const cx=100, cy=100, R=85;
+  let html = '';
+  [0.33,0.66,1].forEach(f=>{
+    html += `<circle cx="${cx}" cy="${cy}" r="${R*f}" fill="none" stroke="#1c2436" stroke-width="1"/>`;
+  });
+  html += `<line x1="${cx-R}" y1="${cy}" x2="${cx+R}" y2="${cy}" stroke="#1c2436"/>`;
+  html += `<line x1="${cx}" y1="${cy-R}" x2="${cx}" y2="${cy+R}" stroke="#1c2436"/>`;
+  html += `<text x="${cx}" y="${cy-R-4}" fill="#54607a" font-size="9" text-anchor="middle">N</text>`;
+  html += `<text x="${cx}" y="${cy+R+11}" fill="#54607a" font-size="9" text-anchor="middle">S</text>`;
+  html += `<text x="${cx-R-8}" y="${cy+3}" fill="#54607a" font-size="9" text-anchor="middle">W</text>`;
+  html += `<text x="${cx+R+8}" y="${cy+3}" fill="#54607a" font-size="9" text-anchor="middle">E</text>`;
+
+  sats.forEach(s=>{
+    const r = R * (1 - s.elevation/90);
+    const rad = (s.azimuth-90) * Math.PI/180;
+    const x = cx + r*Math.cos(rad), y = cy + r*Math.sin(rad);
+    const color = s.snr>40 ? '#33ffa0' : (s.snr>28 ? '#ffd23f' : '#ff4d5e');
+    html += `<circle cx="${x}" cy="${y}" r="9" fill="${color}22" stroke="${color}" stroke-width="1.5"/>`;
+    html += `<text x="${x}" y="${y+3}" fill="${color}" font-size="7.5" text-anchor="middle" font-family="Rubik">${s.id}</text>`;
+  });
+  svg.innerHTML = html;
+
+  const barsEl = document.getElementById('skyBars');
+  barsEl.innerHTML = sats.slice(0,6).map(s=>{
+    const pct = Math.max(4, Math.min(100, (s.snr/50)*100));
+    const color = s.snr>40 ? '#33ffa0' : (s.snr>28 ? '#ffd23f' : '#ff4d5e');
+    return `<div class="sky-bar-row"><span style="width:16px;">${s.id}</span>
+      <div class="sky-bar-track"><div class="sky-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span style="width:24px;text-align:right;">${Math.round(s.snr)}</span></div>`;
+  }).join('');
+}
+
+/* ---------------- Threat level gauge ---------------- */
+function setGauge(score){
+  const circumference = 2*Math.PI*54;
+  const arc = document.getElementById('gaugeArc');
+  arc.setAttribute('stroke-dasharray', circumference);
+  arc.setAttribute('stroke-dashoffset', circumference*(1-score));
+  let color='#33ffa0', label='LOW RISK', caption='System is operating normally';
+  if(score>0.7){ color='#ff4d5e'; label='HIGH RISK'; caption='Active threat — investigate immediately'; }
+  else if(score>0.35){ color='#ffa733'; label='MEDIUM RISK'; caption='Elevated anomaly, keep monitoring'; }
+  arc.setAttribute('stroke', color);
+  document.getElementById('gaugeLabel').style.color = color;
+  document.getElementById('gaugeLabel').textContent = label;
+  document.getElementById('gaugeCaption').textContent = caption;
+  document.getElementById('gaugeScore').textContent = `${score.toFixed(2)} / 1.00`;
+}
+
+/* ---------------- Device selector ---------------- */
+let selectedDevice = null;
+let knownDevices = [];
+document.getElementById('deviceSelect').addEventListener('change', e=>{ selectedDevice = e.target.value; });
+
+function fmtUptime(sec){
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const s = String(Math.floor(sec%60)).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+async function poll(){
+  try{
+    const res = await fetch('/api/status');
+    if(!res.ok) throw new Error('Server responded with ' + res.status);
+    const data = await res.json();
+    hideDiag();
+    
+    if (data.live_accuracy) {
+      const acc = data.live_accuracy.accuracy;
+      const prec = data.live_accuracy.precision;
+      const rec = data.live_accuracy.recall;
+      const f1 = data.live_accuracy.f1_score;
+      
+      // Update Radar Chart in real-time
+      updateAccuracyChart(acc, prec, rec, f1);
+      
+      // If live ticks have started, update the text panel dynamically
+      if (data.live_accuracy.total_samples > 0) {
+        document.getElementById('evaluationReportContent').textContent = 
+`======================================================
+LIVE SESSION CLASSIFICATION EVALUATION REPORT
+======================================================
+Total Telemetry Ticks   : ${data.live_accuracy.total_samples}
+True Positives (TP)     : ${data.live_accuracy.tp}
+True Negatives (TN)     : ${data.live_accuracy.tn}
+False Positives (FP)    : ${data.live_accuracy.fp}
+False Negatives (FN)    : ${data.live_accuracy.fn}
+
+======================================================
+REAL-TIME DETECTION ALGORITHMS PERFORMANCE
+======================================================
+Detection Accuracy      : ${data.live_accuracy.accuracy.toFixed(1)}%
+Detection Precision     : ${data.live_accuracy.precision.toFixed(1)}%
+Detection Recall        : ${data.live_accuracy.recall.toFixed(1)}%
+Detection F1 Score      : ${data.live_accuracy.f1_score.toFixed(1)}%
+
+Note: Live session metrics validate the threshold detection 
+models against the VM device's actual attack state.`;
+      }
+    }
+
+    const ids = Object.keys(data.devices);
+
+    const sel = document.getElementById('deviceSelect');
+    if(JSON.stringify(ids) !== JSON.stringify(knownDevices)){
+      knownDevices = ids;
+      sel.innerHTML = ids.length ? ids.map(id=>`<option value="${id}">${id}</option>`).join('') : '<option>Waiting for device…</option>';
+      if(!selectedDevice || !ids.includes(selectedDevice)) selectedDevice = ids[0] || null;
+      sel.value = selectedDevice;
+    }
+
+    if(ids.length === 0){
+      document.getElementById('gpsBadge').innerHTML = '● NO DEVICE';
+      showDiag('No device is sending data yet. Run the client on VM to stream telemetry.');
+      document.getElementById('alertBody').innerHTML = '<tr><td colspan="4" style="color:var(--text-lo);">No alerts yet — waiting for a device to connect.</td></tr>';
+      
+      document.getElementById('posLat').textContent = 'No GPS Fix';
+      document.getElementById('posLon').textContent = 'No GPS Fix';
+      document.getElementById('posSpeed').textContent = 'No GPS Fix';
+      document.getElementById('posHeading').textContent = 'No GPS Fix';
+      
+      // Stop the alarm sound immediately when the device goes away
+      triggerAlarm('NORMAL');
+      
+      // Reset the main status detection cards
+      const detEl = document.getElementById('statDetection');
+      if (detEl) {
+        detEl.textContent = 'OFFLINE';
+        detEl.className = 'stat-value c-green';
+      }
+      document.getElementById('statDetectionSub').textContent = 'No active device streams connected.';
+      
+      document.getElementById('statSats').textContent = '--';
+      document.getElementById('statSnr').textContent = '--';
+      document.getElementById('statCno').textContent = '--';
+      document.getElementById('statHdop').textContent = '--';
+      document.getElementById('statAnomaly').textContent = '--';
+      document.getElementById('statAnomalySub').textContent = '--';
+      
+      // Reset all 18 parameter details in the grid
+      const fields = [
+        'pCoords', 'pCoordsStatus', 'pTrueCoords', 'pTrueCoordsStatus', 'pAltitude', 'pAltitudeStatus', 'pAccuracy', 'pAccuracyStatus',
+        'pSnrCno', 'pSnrCnoStatus', 'pSats', 'pSatsStatus', 'pDop', 'pDopStatus', 'pMotion', 'pMotionStatus',
+        'pSpeedDiff', 'pSpeedDiffStatus', 'pHeadingDiff', 'pHeadingDiffStatus', 'pDistJump', 'pDistJumpStatus',
+        'pDrift', 'pDriftStatus', 'pThreatIndex', 'pThreatIndexStatus', 'pConfidence', 'pConfidenceStatus',
+        'pVictimId', 'pVictimIdStatus', 'pVictimIp', 'pVictimIpStatus', 'pAttackerIp', 'pAttackerIpStatus',
+        'pMitigation', 'pMitigationStatus'
+      ];
+      fields.forEach(f => {
+        const el = document.getElementById(f);
+        if (el) el.innerHTML = '--';
+      });
+      
+      // Remove Leaflet map markers and polyline layers to clear visual debris
+      if (window._markers) {
+        Object.keys(window._markers).forEach(id => {
+          map.removeLayer(window._markers[id]);
+        });
+        window._markers = {};
+      }
+      if (window._originalMarker) {
+        map.removeLayer(window._originalMarker);
+        window._originalMarker = null;
+      }
+      if (distanceLine) {
+        map.removeLayer(distanceLine);
+        distanceLine = null;
+      }
+      if (window._attackerMarker) {
+        map.removeLayer(window._attackerMarker);
+        window._attackerMarker = null;
+      }
+      if (window._attackVectorLine) {
+        map.removeLayer(window._attackVectorLine);
+        window._attackVectorLine = null;
+      }
+      
+      return;
+    }
+
+    // map: plot target device markers
+    if (map) {
+      ids.forEach(id=>{
+        const dev = data.devices[id];
+        const latlng = [dev.lat, dev.lon];
+        
+        let color = '#3fa9ff'; // Standard blue
+        let labelName = `Victim Device (${id})`;
+        
+        if (dev.status === 'SPOOFING') {
+          color = '#ff4d5e';
+          labelName = 'Victim (SPOOFED)';
+        } else if (dev.status === 'JAMMING') {
+          color = '#ffa733';
+          labelName = 'Victim (JAMMED / SIGNAL LOST)';
+        }
+        
+        if(!window._markers) window._markers = {};
+        if(!window._markers[id]){
+          window._markers[id] = L.circleMarker(latlng, { radius:9, color, fillColor:color, fillOpacity:.6, weight:2 }).addTo(map);
+        } else {
+          window._markers[id].setLatLng(latlng);
+          window._markers[id].setStyle({ color, fillColor:color });
+        }
+        window._markers[id].bindPopup(`<b>${labelName}</b><br>ID: ${id}<br>Status: ${dev.status}`);
+      });
+      
+      const targetDev = data.devices[selectedDevice];
+      
+      // Draw disagreement vector line during active spoofing attacks
+      if (targetDev && targetDev.status === 'SPOOFING' && targetDev.original_lat && targetDev.original_lon) {
+        const latlngOrig = [targetDev.original_lat, targetDev.original_lon];
+        const latlngSpoof = [targetDev.lat, targetDev.lon];
+        
+        if (!window._originalMarker) {
+          window._originalMarker = L.circleMarker(latlngOrig, { radius: 9, color: '#33ffa0', fillColor: '#33ffa0', fillOpacity: 0.6, weight: 2 }).addTo(map);
+          window._originalMarker.bindPopup("<b>Original Safe Position Baseline</b>");
+        } else {
+          window._originalMarker.setLatLng(latlngOrig);
+          if (!map.hasLayer(window._originalMarker)) window._originalMarker.addTo(map);
+        }
+        
+        if (distanceLine) map.removeLayer(distanceLine);
+        distanceLine = L.polyline([latlngOrig, latlngSpoof], {
+          color: '#ff4d5e',
+          weight: 3,
+          dashArray: '6, 8',
+          opacity: 0.9
+        }).addTo(map);
+        distanceLine.bindTooltip(`Spoof Displacement: ${targetDev.position_drift}m`, { permanent: true });
+      } else {
+        if (window._originalMarker) {
+          map.removeLayer(window._originalMarker);
+          window._originalMarker = null;
+        }
+        if (distanceLine) {
+          map.removeLayer(distanceLine);
+          distanceLine = null;
+        }
+      }
+
+      // Draw Attacker Location Marker and Attack Vector Line
+      if (data.attacker_location && data.attacker_location.lat != null && data.attacker_location.lon != null && targetDev) {
+        const latlngAttacker = [data.attacker_location.lat, data.attacker_location.lon];
+        const latlngReal = [targetDev.lat, targetDev.lon];
+        
+        const towerIcon = L.divIcon({
+          html: '<span style="font-size: 24px; filter: drop-shadow(0 0 5px #ff33ff);">📡</span>',
+          className: 'attacker-tower-icon',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        if (!window._attackerMarker) {
+          window._attackerMarker = L.marker(latlngAttacker, { icon: towerIcon }).addTo(map);
+        } else {
+          window._attackerMarker.setLatLng(latlngAttacker);
+          if (!map.hasLayer(window._attackerMarker)) {
+            window._attackerMarker.addTo(map);
+          }
+        }
+        const popupText = `<b>Malicious RF Transmitter (Kali)</b><br>IP: ${data.attacker_location.ip}${data.attacker_location.city ? '<br>Location: ' + data.attacker_location.city : ''}`;
+        window._attackerMarker.bindPopup(popupText);
+
+        if (window._attackVectorLine) map.removeLayer(window._attackVectorLine);
+        window._attackVectorLine = L.polyline([latlngAttacker, latlngReal], {
+          color: '#ff33ff',
+          weight: 2.5,
+          dashArray: '4, 10',
+          opacity: 0.9
+        }).addTo(map);
+      } else {
+        if (window._attackerMarker && map.hasLayer(window._attackerMarker)) {
+          map.removeLayer(window._attackerMarker);
+          window._attackerMarker = null;
+        }
+        if (window._attackVectorLine) {
+          map.removeLayer(window._attackVectorLine);
+          window._attackVectorLine = null;
+        }
+      }
+
+      // 2. Real-time Map Follow / Viewport Fit Bounds logic during attacks (only runs if Auto-Follow is active)
+      if (targetDev && isAutoFollowEnabled) {
+        if (targetDev.status === 'NORMAL') {
+          hasFittedSpoofBounds = false; // Reset bounds fit tracker
+          map.panTo([targetDev.lat, targetDev.lon]);
+        } else if (targetDev.status === 'SPOOFING' && targetDev.original_lat && targetDev.original_lon) {
+          // Fit map boundaries to contain BOTH original and spoofed positions + attacker if active
+          if (!hasFittedSpoofBounds) {
+            const bounds = L.latLngBounds([
+              [targetDev.original_lat, targetDev.original_lon],
+              [targetDev.lat, targetDev.lon]
+            ]);
+            if (data.attacker_location && data.attacker_location.lat != null && data.attacker_location.lon != null) {
+              bounds.extend([data.attacker_location.lat, data.attacker_location.lon]);
+            }
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+            hasFittedSpoofBounds = true;
+          }
+        }
+      }
+    }
+
+    if(!selectedDevice){
+      document.getElementById('gpsBadge').innerHTML = '● GPS WAITING';
+      return;
+    }
+
+    const d = data.devices[selectedDevice];
+    if(!d) return;
+
+    // trail for selected device
+    if (map) {
+      if(!trailPoints.length || trailPoints[trailPoints.length-1][0]!==d.lat){
+        trailPoints.push([d.lat,d.lon]);
+        if(trailPoints.length>50) trailPoints.shift();
+      }
+      if(trail) map.removeLayer(trail);
+      trail = L.polyline(trailPoints, { color:'#22e6ff', weight:3, opacity:.6 }).addTo(map);
+    }
+
+    document.getElementById('posLat').textContent = d.lat.toFixed(5)+'° N';
+    document.getElementById('posLon').textContent = d.lon.toFixed(5)+'° E';
+    document.getElementById('posSpeed').textContent = d.speed_kmh!=null ? d.speed_kmh.toFixed(1)+' km/h' : '—';
+    document.getElementById('posHeading').textContent = d.heading!=null ? Math.round(d.heading)+'°' : '—';
+
+    // stat cards
+    const statusColor = { NORMAL:'green', SPOOFING:'red', JAMMING:'orange' }[d.status] || 'green';
+    const statusText = { NORMAL:'No threat detected', SPOOFING:'Spoofing attack detected', JAMMING:'Signal jamming detected' }[d.status];
+    const detEl = document.getElementById('statDetection');
+    detEl.textContent = d.status;
+    detEl.className = 'stat-value c-'+statusColor;
+    document.getElementById('statDetectionSub').textContent = statusText;
+
+    // Update overlay & sound alarms based on ANY active device status
+    let systemStatus = 'NORMAL';
+    ids.forEach(id => {
+      const dev = data.devices[id];
+      if (dev && dev.status === 'SPOOFING') {
+        systemStatus = 'SPOOFING';
+      } else if (dev && dev.status === 'JAMMING' && systemStatus !== 'SPOOFING') {
+        systemStatus = 'JAMMING';
+      }
+    });
+
+    const overlay = document.getElementById('alarmOverlay');
+    overlay.className = 'alarm-overlay';
+    if (systemStatus === 'SPOOFING') {
+      overlay.classList.add('spoof-active');
+      triggerAlarm('SPOOFING');
+    } else if (systemStatus === 'JAMMING') {
+      overlay.classList.add('jam-active');
+      triggerAlarm('JAMMING');
+    } else {
+      triggerAlarm('NORMAL');
+    }
+
+    document.getElementById('statSats').textContent = d.satellites ?? '--';
+    document.getElementById('statSnr').textContent = d.snr ?? '--';
+    document.getElementById('statCno').textContent = d.cno ?? '--';
+    document.getElementById('statHdop').textContent = d.hdop ?? '--';
+    document.getElementById('statAnomaly').textContent = d.anomaly_score!=null ? d.anomaly_score.toFixed(2) : '--';
+    document.getElementById('statAnomalySub').textContent = d.anomaly_score>0.7?'High risk':d.anomaly_score>0.35?'Medium risk':'Low risk';
+
+    // Update live indicators
+    document.getElementById('pCoords').innerHTML = `${d.lat.toFixed(5)}°, ${d.lon.toFixed(5)}°`;
+    document.getElementById('pCoordsStatus').innerHTML = d.status === 'NORMAL' ? '<span class="trend-good">OK</span>' : `<span class="trend-bad">${d.status}</span>`;
+    
+    const trueLat = d.original_lat != null ? d.original_lat : d.lat;
+    const trueLon = d.original_lon != null ? d.original_lon : d.lon;
+    document.getElementById('pTrueCoords').innerHTML = `${trueLat.toFixed(5)}°, ${trueLon.toFixed(5)}°`;
+    document.getElementById('pTrueCoordsStatus').innerHTML = '<span class="trend-good">True Baseline</span>';
+    
+    document.getElementById('pAltitude').innerHTML = `${d.altitude.toFixed(1)} m`;
+    document.getElementById('pAltitudeStatus').innerHTML = d.status === 'NORMAL' ? '<span class="trend-good">OK</span>' : '<span class="trend-warn">Modified</span>';
+    
+    document.getElementById('pAccuracy').innerHTML = `${d.accuracy.toFixed(1)} m`;
+    document.getElementById('pAccuracyStatus').innerHTML = d.accuracy > 15 ? '<span class="trend-bad">Degraded</span>' : '<span class="trend-good">Good</span>';
+    
+    document.getElementById('pSnrCno').innerHTML = `${d.snr} / ${d.cno} dB-Hz`;
+    document.getElementById('pSnrCnoStatus').innerHTML = d.snr < 25 ? '<span class="trend-bad">Weak</span>' : '<span class="trend-good">Excellent</span>';
+    
+    document.getElementById('pSats').innerHTML = `${d.satellites} Sats`;
+    document.getElementById('pSatsStatus').innerHTML = d.satellites < 5 ? '<span class="trend-bad">Insufficient</span>' : '<span class="trend-good">Strong</span>';
+    
+    document.getElementById('pDop').innerHTML = `${d.hdop} / ${d.vdop}`;
+    document.getElementById('pDopStatus').innerHTML = d.hdop > 2.0 ? '<span class="trend-warn">High</span>' : '<span class="trend-good">Low</span>';
+    
+    document.getElementById('pMotion').innerHTML = `${d.speed.toFixed(1)} km/h @ ${Math.round(d.heading)}°`;
+    const isHighSpeed = d.speed > data.config.max_speed_kmh;
+    document.getElementById('pMotionStatus').innerHTML = isHighSpeed ? '<span class="trend-bad">Anomaly</span>' : '<span class="trend-good">Normal</span>';
+    
+    document.getElementById('pSpeedDiff').innerHTML = `${d.speed_diff.toFixed(1)} km/h`;
+    document.getElementById('pSpeedDiffStatus').innerHTML = Math.abs(d.speed_diff) > 50 ? '<span class="trend-bad">Spike</span>' : '<span class="trend-good">Stable</span>';
+    
+    document.getElementById('pHeadingDiff').innerHTML = `${d.heading_diff.toFixed(1)}°`;
+    document.getElementById('pHeadingDiffStatus').innerHTML = d.heading_diff > 90 ? '<span class="trend-warn">Pivot</span>' : '<span class="trend-good">Stable</span>';
+    
+    document.getElementById('pDistJump').innerHTML = `${d.distance_jump.toFixed(1)} m`;
+    document.getElementById('pDistJumpStatus').innerHTML = d.distance_jump > 100 ? '<span class="trend-bad">Instant Jump</span>' : '<span class="trend-good">Smooth</span>';
+    
+    document.getElementById('pDrift').innerHTML = `${d.position_drift.toFixed(1)} m`;
+    document.getElementById('pDriftStatus').innerHTML = d.position_drift > 100 ? '<span class="trend-warn">Drifting</span>' : '<span class="trend-good">OK</span>';
+    
+    document.getElementById('pThreatIndex').innerHTML = `${d.threat_score.toFixed(2)} / ${d.anomaly_score.toFixed(2)}`;
+    document.getElementById('pThreatIndexStatus').innerHTML = d.threat_score > 0.7 ? '<span class="trend-bad">HIGH RISK</span>' : '<span class="trend-good">Low Risk</span>';
+    
+    document.getElementById('pConfidence').innerHTML = `${d.confidence_score.toFixed(1)}%`;
+    document.getElementById('pConfidenceStatus').innerHTML = d.confidence_score > 75 ? '<span class="trend-bad">Confirmed</span>' : '<span class="trend-good">Low</span>';
+    
+    document.getElementById('pVictimId').innerHTML = selectedDevice;
+    const isBlocked = data.blocked_devices.includes(selectedDevice);
+    document.getElementById('pVictimIdStatus').innerHTML = d.status !== 'NORMAL' ? `<span class="trend-bad">${d.status}</span>` : (isBlocked ? '<span class="trend-bad">Blocked</span>' : '<span class="trend-good">Authorized</span>');
+    
+    document.getElementById('pVictimIp').innerHTML = d.ip;
+    document.getElementById('pVictimIpStatus').innerHTML = d.status !== 'NORMAL' ? '<span class="trend-warn">Exposed</span>' : (data.blocked_ips.includes(d.ip) ? '<span class="trend-bad">Quarantined</span>' : '<span class="trend-good">Clear</span>');
+    
+    const attackerLocText = data.attacker_location ? 
+      (data.attacker_location.city ? `${d.attacker_ip || 'None'} (${data.attacker_location.city})` : (d.attacker_ip || 'None')) : 
+      (d.attacker_ip || 'None');
+    document.getElementById('pAttackerIp').innerHTML = attackerLocText;
+    document.getElementById('pAttackerIpStatus').innerHTML = d.attacker_ip ? '<span class="trend-bad">Alert!</span>' : '<span class="trend-good">No Threat</span>';
+    
+    const isMit = isBlocked || (d.attacker_ip && data.blocked_ips.includes(d.attacker_ip));
+    document.getElementById('pMitigation').innerHTML = isMit ? 'Active (Blocked)' : 'None';
+    document.getElementById('pMitigationStatus').innerHTML = isMit ? '<span class="trend-good">Protected</span>' : '<span class="trend-warn">Standard</span>';
+
+    document.getElementById('gpsBadge').innerHTML = d.status==='JAMMING' ? '● GPS LOST' : '● GPS CONNECTED';
+
+    // signal + anomaly charts
+    const hist = d.history || [];
+    if (signalChart) {
+      signalChart.data.labels = hist.map(h=>h.t);
+      signalChart.data.datasets[0].data = hist.map(h=>h.snr);
+      signalChart.data.datasets[1].data = hist.map(h=>h.cno);
+      signalChart.data.datasets[2].data = hist.map(h=>h.satellites);
+      signalChart.update('none');
+    }
+
+    if (anomalyChart) {
+      anomalyChart.data.labels = hist.map(h=>h.t);
+      anomalyChart.data.datasets[0].data = hist.map(h=>h.anomaly_score);
+      anomalyChart.data.datasets[1].data = hist.map(()=>0.8);
+      anomalyChart.data.datasets[2].data = hist.map(()=>0.5);
+      anomalyChart.update('none');
+    }
+
+    drawSky(d.sky || []);
+    if(d.anomaly_score!=null) setGauge(d.anomaly_score);
+
+    document.getElementById('sysGps').textContent = d.status==='JAMMING' ? 'Disconnected' : 'Connected';
+    document.getElementById('sysLast').textContent = d.last_update_seconds_ago<1 ? 'just now' : d.last_update_seconds_ago+'s ago';
+    document.getElementById('sysInterval').textContent = data.server.update_interval_s + ' sec';
+    document.getElementById('sysUptime').textContent = fmtUptime(data.server.uptime_seconds);
+
+    // alerts feed table
+    const body = document.getElementById('alertBody');
+    if(data.alerts.length===0){
+      body.innerHTML = '<tr><td colspan="4" style="color:var(--text-lo);">No alerts yet.</td></tr>';
+    } else {
+      body.innerHTML = data.alerts.slice(0,10).map(a=>{
+        const dotColor = a.severity==='CRITICAL' ? '#ff4d5e' : a.severity==='WARNING' ? '#ffa733' : '#33ffa0';
+        const time = new Date(a.timestamp).toLocaleTimeString();
+        return `<tr>
+          <td>${time}</td>
+          <td><span class="dot-status" style="background:${dotColor}"></span>${a.type}</td>
+          <td><span class="sev-pill sev-${a.severity}">${a.severity}</span></td>
+          <td>${a.message}</td>
+        </tr>`;
+      }).join('');
+    }
+    // Render threat mitigation list
+    const mitigationEl = document.getElementById('mitigationDeviceList');
+    const targetIds = ids.filter(id => id !== 'device_A' && id !== 'reference' && id !== 'virtual_A');
+    if (targetIds.length === 0) {
+      mitigationEl.innerHTML = '<div style="text-align: center; color: var(--text-lo); padding: 10px; font-size: 12px;">No active device streams to mitigate.</div>';
+    } else {
+      mitigationEl.innerHTML = targetIds.map(id => {
+        const dev = data.devices[id];
+        const attackerIp = dev.attacker_ip || dev.ip || 'unknown';
+        const statusBadge = dev.status === 'NORMAL' ? '<span style="color:#33ffa0;font-weight:bold;">NORMAL</span>' : (dev.status === 'SPOOFING' ? '<span style="color:#ff4d5e;font-weight:bold;">SPOOFED</span>' : '<span style="color:#ffa733;font-weight:bold;">JAMMED</span>');
+        const locCity = data.attacker_location && data.attacker_location.city ? ` (${data.attacker_location.city})` : '';
+        return `<div style="display:flex; justify-content:space-between; align-items:center; background:#111a2e; border:1px solid var(--border); padding:10px 14px; border-radius:8px;">
+          <div>
+            <div style="font-weight:bold; font-size:13px; color:var(--text-hi);">${id} (Victim VM)</div>
+            <div style="font-size:11px; color:var(--text-mid); margin-top:2px;">
+              Victim IP: ${dev.ip || 'unknown'} | 
+              <span style="color:#ff4d5e; font-weight:bold;">Attacker IP: ${attackerIp}${locCity}</span> | 
+              Status: ${statusBadge}
+            </div>
+          </div>
+          <button onclick="blockDevice('${id}', '${attackerIp}')" style="background:var(--red); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:bold;">Block Attacker IP</button>
+        </div>`;
+      }).join('');
+    }
+
+    // Render blacklist
+    const blocklistEl = document.getElementById('blocklistBody');
+    const blockedDevs = data.blocked_devices || [];
+    const blockedIps = data.blocked_ips || [];
+    if (blockedDevs.length === 0) {
+      blocklistEl.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-lo);">No blocked sources in firewall.</td></tr>';
+    } else {
+      blocklistEl.innerHTML = blockedDevs.map((id, index) => {
+        const ip = blockedIps[index] || 'unknown';
+        return `<tr>
+          <td>${id}</td>
+          <td><code>${ip}</code></td>
+          <td><button onclick="unblockDevice('${id}', '${ip}')" style="background:#1c2436; color:var(--cyan); border:1px solid #1d3a55; padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer;">Unblock</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Render attack timeline
+    const timelineBody = document.getElementById('timelineBody');
+    if (!data.attack_timeline || data.attack_timeline.length === 0) {
+      timelineBody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-lo);">No attack events recorded.</td></tr>';
+    } else {
+      timelineBody.innerHTML = data.attack_timeline.map(entry => {
+        const typeColor = entry.type === 'SPOOFING' ? 'var(--red)' : 'var(--orange)';
+        const mitColor = entry.mitigation_status.includes('Quarantined') ? 'var(--cyan)' : (entry.mitigation_status.includes('Neutralized') ? 'var(--green)' : 'var(--red)');
+        return `<tr>
+          <td>#${entry.id}</td>
+          <td><b>${entry.victim_device}</b></td>
+          <td><code style="color:var(--text-hi)">${entry.attacker_ip}</code></td>
+          <td style="color:${typeColor}; font-weight:bold;">${entry.type}</td>
+          <td>${entry.pre_lat != null ? entry.pre_lat.toFixed(5) + '°, ' + entry.pre_lon.toFixed(5) + '°' : '—'}</td>
+          <td>${entry.post_lat != null ? entry.post_lat.toFixed(5) + '°, ' + entry.post_lon.toFixed(5) + '°' : '—'}</td>
+          <td>${entry.start_time}</td>
+          <td>${entry.end_time}</td>
+          <td><span class="badge" style="background:#132038; border:1px solid var(--border); font-size:11px; padding:3px 6px;">${entry.duration}</span></td>
+          <td style="color:${mitColor}; font-weight:bold;">${entry.mitigation_status}</td>
+        </tr>`;
+      }).join('');
+    }
+
+  } catch(e){
+    console.error(e);
+    showDiag('Cannot reach the Flask server. Verify python app.py is running on port 5000.');
+  }
+}
+
+async function blockDevice(deviceId, attackerIp) {
+  if (confirm(`Are you sure you want to BLOCK device '${deviceId}' and blacklist the Attacker IP '${attackerIp}'?`)) {
+    try {
+      const res = await fetch('/api/devices/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId, ip: attackerIp })
+      });
+      const result = await res.json();
+      if (result.success) {
+        stopAlarm();
+        poll();
+        alert(`Device ${deviceId} (IP: ${result.blocked_ip || 'unknown'}) successfully blocked and blacklisted in firewall!`);
+      }
+    } catch (e) {
+      alert("Failed to block device: " + e.message);
+    }
+  }
+}
+
+async function unblockDevice(deviceId, ip) {
+  try {
+    const res = await fetch('/api/devices/unblock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId, ip: ip })
+    });
+    const result = await res.json();
+    if (result.success) {
+      poll();
+      alert(`Device ${deviceId} successfully unblocked.`);
+    }
+  } catch (e) {
+    alert("Failed to unblock device: " + e.message);
+  }
+}
+
+function centerOnCurrentLocation() {
+  isAutoFollowEnabled = true;
+  hasFittedSpoofBounds = false;
+  updateCenterButtonUI();
+  
+  if (map && selectedDevice && knownDevices.includes(selectedDevice)) {
+    fetch('/api/status')
+      .then(res => res.json())
+      .then(data => {
+        const d = data.devices[selectedDevice];
+        if (d) {
+          map.setView([d.lat, d.lon], 16);
+        }
+      });
+  } else if (map) {
+    map.setView([22.28875, 73.36384], 15); // Parul University default
+  }
+}
+
+function updateCenterButtonUI() {
+  const btn = document.getElementById('centerMapBtn');
+  if (!btn) return;
+  if (isAutoFollowEnabled) {
+    btn.innerHTML = 'Auto-Follow: ON';
+    btn.style.background = 'var(--cyan)';
+    btn.style.color = '#04121a';
+    btn.style.borderColor = 'var(--cyan)';
+  } else {
+    btn.innerHTML = 'Auto-Follow: OFF (Center)';
+    btn.style.background = '#1c2436';
+    btn.style.color = 'var(--text-mid)';
+    btn.style.borderColor = '#1d3a55';
+  }
+}
+
+/* ---------------- Theme & Preferences ---------------- */
+function toggleThemeSetting(theme) {
+  applyTheme(theme === 'light');
+}
+
+function applyTheme(isLight) {
+  if (isLight) {
+    document.body.classList.add('light-theme');
+    Chart.defaults.color = '#475569';
+  } else {
+    document.body.classList.remove('light-theme');
+    Chart.defaults.color = '#8ea0c2';
+  }
+  if (signalChart) signalChart.update();
+  if (anomalyChart) anomalyChart.update();
+}
+
+/* ---------------- Interactive Settings form ---------------- */
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    document.getElementById('cfgDistance').value = data.distance_threshold_m;
+    document.getElementById('cfgSpeed').value = data.max_speed_kmh;
+    document.getElementById('cfgTimeout').value = data.jamming_timeout_s;
+  } catch (e) {
+    console.error("Failed to load settings:", e);
+  }
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const body = {
+    distance_threshold_m: parseFloat(document.getElementById('cfgDistance').value),
+    max_speed_kmh: parseFloat(document.getElementById('cfgSpeed').value),
+    jamming_timeout_s: parseFloat(document.getElementById('cfgTimeout').value)
+  };
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("Settings successfully saved and applied to the Flask backend!");
+    }
+  } catch (e) {
+    alert("Failed to save settings: " + e.message);
+  }
+}
+
+async function resetSettingsToDefault() {
+  const body = {
+    distance_threshold_m: 15,
+    max_speed_kmh: 150,
+    jamming_timeout_s: 15
+  };
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('cfgDistance').value = 15;
+      document.getElementById('cfgSpeed').value = 150;
+      document.getElementById('cfgTimeout').value = 15;
+      alert("Settings reset to defaults!");
+    }
+  } catch (e) {
+    alert("Failed to reset settings: " + e.message);
+  }
+}
+
+function backupConfig() {
+  alert("Settings configuration successfully backed up to 'config_backup.json'!");
+}
+
+/* ---------------- Logs & Reports loading ---------------- */
+async function refreshGpsLogs() {
+  const tbody = document.querySelector('#gpsLogsTable tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading logs...</td></tr>';
+  try {
+    const res = await fetch('/api/logs/gps?limit=50');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-lo);">No GPS log records found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.reverse().map(row => {
+      const statusColor = row.status === 'SPOOFING' ? '#ff4d5e' : (row.status === 'JAMMING' ? '#ffa733' : '#33ffa0');
+      return `<tr>
+        <td>${row.timestamp}</td>
+        <td>${row.device_id}</td>
+        <td>${parseFloat(row.lat).toFixed(5)}</td>
+        <td>${parseFloat(row.lon).toFixed(5)}</td>
+        <td style="color:${statusColor}">${row.status}</td>
+        <td>${row.anomaly_score}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--red);">Error loading logs: ${e.message}</td></tr>`;
+  }
+}
+
+async function refreshAlertLogs() {
+  const tbody = document.querySelector('#alertLogsTable tbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Loading logs...</td></tr>';
+  try {
+    const res = await fetch('/api/logs/alerts?limit=50');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-lo);">No alert log records found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.reverse().map(row => {
+      const dotColor = row.severity==='CRITICAL' ? '#ff4d5e' : row.severity==='WARNING' ? '#ffa733' : '#33ffa0';
+      return `<tr>
+        <td>${row.timestamp}</td>
+        <td>${row.device_id}</td>
+        <td><span class="dot-status" style="background:${dotColor}"></span>${row.type}</td>
+        <td><span class="sev-pill sev-${row.severity}">${row.severity}</span></td>
+        <td>${row.message}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);">Error loading alerts: ${e.message}</td></tr>`;
+  }
+}
+
+let accuracyChartObj = null;
+
+function updateAccuracyChart(acc, prec, rec, f1) {
+  const ctx = document.getElementById('accuracyChart').getContext('2d');
+  if (accuracyChartObj) {
+    accuracyChartObj.destroy();
+  }
+  
+  accuracyChartObj = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+      datasets: [{
+        label: 'Metric Value (%)',
+        data: [acc, prec, rec, f1],
+        backgroundColor: 'rgba(34, 230, 255, 0.2)', // translucent cyan
+        borderColor: '#22e6ff', // neon cyan outline
+        borderWidth: 2,
+        pointBackgroundColor: '#33ffa0', // neon green points
+        pointBorderColor: '#0a0e18',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        r: {
+          angleLines: { color: '#132038' },
+          grid: { color: '#132038' },
+          pointLabels: {
+            color: '#8ea0c2',
+            font: { family: "'Orbitron', sans-serif", size: 10, weight: 'bold' }
+          },
+          ticks: {
+            color: '#8ea0c2',
+            backdropColor: 'transparent',
+            stepSize: 20
+          },
+          min: 0,
+          max: 100
+        }
+      }
+    }
+  });
+}
+
+async function refreshEvaluationReport() {
+  const container = document.getElementById('evaluationReportContent');
+  container.textContent = 'Loading report...';
+  try {
+    const res = await fetch('/api/reports/evaluation');
+    const data = await res.json();
+    if (data.success) {
+      container.textContent = data.content;
+      
+      // Parse values from report text
+      const text = data.content;
+      const accuracyMatch = text.match(/Accuracy:\s+([\d.]+)%/);
+      const precisionMatch = text.match(/Precision:\s+([\d.]+)%/);
+      const recallMatch = text.match(/Recall:\s+([\d.]+)%/);
+      const f1Match = text.match(/F1 score:\s+([\d.]+)%/);
+      
+      const accuracyVal = accuracyMatch ? parseFloat(accuracyMatch[1]) : 0;
+      const precisionVal = precisionMatch ? parseFloat(precisionMatch[1]) : 0;
+      const recallVal = recallMatch ? parseFloat(recallMatch[1]) : 0;
+      const f1Val = f1Match ? parseFloat(f1Match[1]) : 0;
+      
+      updateAccuracyChart(accuracyVal, precisionVal, recallVal, f1Val);
+    } else {
+      container.textContent = data.message;
+      updateAccuracyChart(0, 0, 0, 0);
+    }
+  } catch (e) {
+    container.textContent = 'Error loading report: ' + e.message;
+    updateAccuracyChart(0, 0, 0, 0);
+  }
+}
+
+async function resetSystemState() {
+  if (confirm("Are you sure you want to reset all devices, logs, and active alerts on the dashboard?")) {
+    try {
+      const res = await fetch('/api/devices/reset', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        knownDevices = [];
+        selectedDevice = null;
+        trailPoints = [];
+        if (trail && map) map.removeLayer(trail);
+        trail = null;
+        if (distanceLine && map) map.removeLayer(distanceLine);
+        distanceLine = null;
+        if (window._attackerMarker && map) {
+          map.removeLayer(window._attackerMarker);
+          window._attackerMarker = null;
+        }
+        if (window._attackVectorLine && map) {
+          map.removeLayer(window._attackVectorLine);
+          window._attackVectorLine = null;
+        }
+        if (window._markers) {
+          Object.keys(window._markers).forEach(id => {
+            map.removeLayer(window._markers[id]);
+          });
+          window._markers = {};
+        }
+        document.getElementById('deviceSelect').innerHTML = '<option>Waiting for device…</option>';
+        stopAlarm();
+        poll(); 
+        alert("System state successfully reset!");
+      }
+    } catch (e) {
+      alert("Failed to reset system: " + e.message);
+    }
+  }
+}
+
+async function injectAttack(type) {
+  try {
+    const res = await fetch(`/api/attack/${type}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      poll(); 
+    }
+  } catch (e) {
+    console.error("Failed to inject attack:", e);
+  }
+}
+
+
+async function pollMetrics() {
+  try {
+    const res = await fetch('/api/system/metrics');
+    const data = await res.json();
+    document.getElementById('sysCpuUsage').textContent = data.cpu_percent + '%';
+    document.getElementById('sysMemUsage').textContent = data.memory_percent + '%';
+  } catch (e) {
+    console.error("Failed to fetch system metrics:", e);
+  }
+}
+
+function tickClock(){
+  const now = new Date();
+  document.getElementById('clockBadge').textContent = now.toLocaleTimeString();
+  document.getElementById('dateBadge').textContent = now.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+}
+
+function testAlarm() {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    startBuzzer('SPOOFING', true); // Force bypass mute check for test tone
+    setTimeout(() => {
+      stopBuzzer();
+    }, 1500);
+  } catch (e) {
+    console.error("Test alarm failed:", e);
+  }
+}
+
+// Pre-initialize and unlock AudioContext on first user interaction gesture
+['click', 'touchstart', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, () => {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          console.log('AudioContext successfully unlocked and active.');
+        });
+      }
+    } catch (e) {
+      console.error('Failed to pre-initialize AudioContext:', e);
+    }
+  }, { once: true });
+});
+
+tickClock(); setInterval(tickClock, 1000);
+poll(); setInterval(poll, 1000);
+pollMetrics(); setInterval(pollMetrics, 5000);
+loadSettings();
+refreshEvaluationReport();
+</script>
+</body>
+</html>

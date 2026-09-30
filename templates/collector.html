@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GPS Collector</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: Arial, sans-serif; background:#0f1117; color:#e6e6e6; padding:20px; }
+  input, button { font-size:16px; padding:10px; border-radius:6px; border:1px solid #333; width:100%; box-sizing:border-box; margin-top:8px; }
+  button { background:#2ecc71; color:#0f1117; font-weight:bold; border:none; }
+  button.stop { background:#e74c3c; color:#fff; }
+  #log { margin-top:16px; font-size:12px; color:#9aa4b2; white-space:pre-wrap; max-height:300px; overflow-y:auto; background:#161a22; padding:10px; border-radius:6px; }
+</style>
+</head>
+<body>
+<h2>GPS Collector</h2>
+<p>Enter a unique name for this device (e.g. <code>phone_A</code>), then start sending. Keep this tab open.</p>
+<input id="deviceId" placeholder="device_id, e.g. phone_A" value="phone_A">
+<input id="serverUrl" placeholder="server URL" value="">
+<button id="startBtn">Start Sending</button>
+<button id="stopBtn" class="stop" style="display:none;">Stop</button>
+<div id="log"></div>
+
+<script>
+document.getElementById('serverUrl').value = window.location.origin + '/update';
+let watchId = null;
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+}
+
+async function sendPosition(pos) {
+  const deviceId = document.getElementById('deviceId').value.trim() || 'phone_unknown';
+  const url = document.getElementById('serverUrl').value.trim();
+  const body = {
+    device_id: deviceId,
+    lat: pos.coords.latitude,
+    lon: pos.coords.longitude,
+    accuracy: pos.coords.accuracy
+  };
+  if (pos.coords.speed != null) body.speed_kmh = pos.coords.speed * 3.6;
+  if (pos.coords.heading != null) body.heading = pos.coords.heading;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    log(`Sent (${body.lat.toFixed(5)}, ${body.lon.toFixed(5)}) acc=${body.accuracy?.toFixed(0)}m -> ${data.status}`);
+  } catch (e) {
+    log('Send failed: ' + e.message);
+  }
+}
+
+document.getElementById('startBtn').onclick = () => {
+  if (!navigator.geolocation) { log('Geolocation not supported on this browser.'); return; }
+  watchId = navigator.geolocation.watchPosition(sendPosition, err => log('GPS error: ' + err.message), {
+    enableHighAccuracy: true, maximumAge: 0, timeout: 10000
+  });
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = 'block';
+  log('Started watching position…');
+};
+
+document.getElementById('stopBtn').onclick = () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  document.getElementById('startBtn').style.display = 'block';
+  document.getElementById('stopBtn').style.display = 'none';
+  log('Stopped.');
+};
+</script>
+</body>
+</html>
