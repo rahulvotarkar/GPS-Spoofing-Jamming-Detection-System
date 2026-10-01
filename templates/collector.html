@@ -2,74 +2,600 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>GPS Collector</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeoPulse | Live Navigation & Location Services</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<!-- Leaflet OpenStreetMap CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
-  body { font-family: Arial, sans-serif; background:#0f1117; color:#e6e6e6; padding:20px; }
-  input, button { font-size:16px; padding:10px; border-radius:6px; border:1px solid #333; width:100%; box-sizing:border-box; margin-top:8px; }
-  button { background:#2ecc71; color:#0f1117; font-weight:bold; border:none; }
-  button.stop { background:#e74c3c; color:#fff; }
-  #log { margin-top:16px; font-size:12px; color:#9aa4b2; white-space:pre-wrap; max-height:300px; overflow-y:auto; background:#161a22; padding:10px; border-radius:6px; }
+  :root {
+    --bg-dark: #0f172a;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --primary: #38bdf8;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Navigation Header */
+  .navbar {
+    background: rgba(30, 41, 59, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--card-border);
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+  
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--primary);
+  }
+  
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(56, 189, 248, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .session-tag {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--card-border);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--text-secondary);
+  }
+
+  /* Main App Container */
+  .app-container {
+    flex: 1;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Location Address Readout Banner */
+  .address-card {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(30, 41, 59, 0.6));
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .address-icon {
+    font-size: 24px;
+  }
+  
+  .address-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .address-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+  }
+  
+  .address-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* Interactive Map Card */
+  .map-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    overflow: hidden;
+    height: 260px;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  
+  #userMap {
+    width: 100%;
+    height: 100%;
+    background: #0f172a;
+  }
+
+  /* Mode Selector Pills */
+  .mode-selector {
+    display: flex;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 6px;
+    border-radius: 12px;
+  }
+  
+  .mode-pill {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+  
+  .mode-pill.active {
+    background: var(--primary);
+    color: #0f172a;
+  }
+
+  /* Live Location Stats Panel */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+  }
+  
+  .stat-value {
+    font-size: 15px;
+    font-weight: 600;
+    font-family: monospace;
+    color: var(--primary);
+  }
+
+  /* Primary Action Control */
+  .action-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .btn-primary {
+    background: var(--success);
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 16px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+  }
+  
+  .btn-primary:active { transform: scale(0.98); }
+  
+  .btn-danger {
+    background: var(--danger);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    background: var(--text-secondary);
+  }
+  .dot-active {
+    background: var(--success);
+    box-shadow: 0 0 10px var(--success);
+  }
+
+  .banner {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    display: none;
+  }
+  .banner-info {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #7dd3fc;
+  }
+  .banner-warn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+  }
+
+  .user-location-marker {
+    width: 16px;
+    height: 16px;
+    background: #38bdf8;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #38bdf8;
+  }
 </style>
 </head>
 <body>
-<h2>GPS Collector</h2>
-<p>Enter a unique name for this device (e.g. <code>phone_A</code>), then start sending. Keep this tab open.</p>
-<input id="deviceId" placeholder="device_id, e.g. phone_A" value="phone_A">
-<input id="serverUrl" placeholder="server URL" value="">
-<button id="startBtn">Start Sending</button>
-<button id="stopBtn" class="stop" style="display:none;">Stop</button>
-<div id="log"></div>
+
+<!-- Navigation Header -->
+<div class="navbar">
+  <div class="brand">
+    <div class="brand-icon">🌐</div>
+    <span>GeoPulse</span>
+  </div>
+  <div class="session-tag" id="sessionBadge">USER-ID</div>
+</div>
+
+<!-- Main App Body -->
+<div class="app-container">
+
+  <!-- Location Address Readout -->
+  <div class="address-card">
+    <div class="address-icon">📍</div>
+    <div class="address-text">
+      <span class="address-title">Current Location Address</span>
+      <span class="address-value" id="addressText">Resolving location address...</span>
+    </div>
+  </div>
+
+  <!-- Interactive Map -->
+  <div class="map-card">
+    <div id="userMap"></div>
+  </div>
+
+  <!-- Tracking Mode Selector -->
+  <div class="mode-selector">
+    <div class="mode-pill active" onclick="setMode(this, 'walk')">🚶 Pedestrian</div>
+    <div class="mode-pill" onclick="setMode(this, 'drive')">🚗 Driving</div>
+    <div class="mode-pill" onclick="setMode(this, 'survey')">🛰️ High Precision</div>
+  </div>
+
+  <!-- Live Gauges Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-label">Latitude</span>
+      <span class="stat-value" id="valLat">22.3050</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Longitude</span>
+      <span class="stat-value" id="valLon">73.4802</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Accuracy</span>
+      <span class="stat-value" id="valAcc">10 m</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Speed</span>
+      <span class="stat-value" id="valSpeed">0 km/h</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Altitude</span>
+      <span class="stat-value" id="valAlt">35 m</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Last Sync</span>
+      <span class="stat-value" id="valSync">Standby</span>
+    </div>
+  </div>
+
+  <!-- Primary Controls -->
+  <div class="action-panel">
+    <div class="status-indicator">
+      <span>Dashboard Sync:</span>
+      <span id="statusText"><span class="dot" id="statusDot"></span> Ready to Broadcast</span>
+    </div>
+
+    <button class="btn-primary" id="toggleBtn">
+      <span>📍 Start Location Sharing</span>
+    </button>
+  </div>
+
+  <div class="banner" id="bannerNotice"></div>
+
+</div>
+
+<!-- Leaflet Map Script -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-document.getElementById('serverUrl').value = window.location.origin + '/update';
-let watchId = null;
-
-function log(msg) {
-  const el = document.getElementById('log');
-  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
-}
-
-async function sendPosition(pos) {
-  const deviceId = document.getElementById('deviceId').value.trim() || 'phone_unknown';
-  const url = document.getElementById('serverUrl').value.trim();
-  const body = {
-    device_id: deviceId,
-    lat: pos.coords.latitude,
-    lon: pos.coords.longitude,
-    accuracy: pos.coords.accuracy
-  };
-  if (pos.coords.speed != null) body.speed_kmh = pos.coords.speed * 3.6;
-  if (pos.coords.heading != null) body.heading = pos.coords.heading;
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    log(`Sent (${body.lat.toFixed(5)}, ${body.lon.toFixed(5)}) acc=${body.accuracy?.toFixed(0)}m -> ${data.status}`);
-  } catch (e) {
-    log('Send failed: ' + e.message);
+  function getDeviceId() {
+    let sessDev = "{{ user_device or '' }}";
+    if (sessDev) {
+      localStorage.setItem('geopulse_device_id', sessDev);
+      return sessDev;
+    }
+    let id = localStorage.getItem('geopulse_device_id');
+    if (!id) {
+      const hex = Math.floor(Math.random() * 0xFFFFFF).toString(16).toUpperCase().padStart(6, '0');
+      id = `USER-${hex}`;
+      localStorage.setItem('geopulse_device_id', id);
+    }
+    return id;
   }
-}
 
-document.getElementById('startBtn').onclick = () => {
-  if (!navigator.geolocation) { log('Geolocation not supported on this browser.'); return; }
-  watchId = navigator.geolocation.watchPosition(sendPosition, err => log('GPS error: ' + err.message), {
-    enableHighAccuracy: true, maximumAge: 0, timeout: 10000
-  });
-  document.getElementById('startBtn').style.display = 'none';
-  document.getElementById('stopBtn').style.display = 'block';
-  log('Started watching position…');
-};
+  const deviceId = getDeviceId();
+  document.getElementById('sessionBadge').textContent = deviceId;
 
-document.getElementById('stopBtn').onclick = () => {
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  document.getElementById('startBtn').style.display = 'block';
-  document.getElementById('stopBtn').style.display = 'none';
-  log('Stopped.');
-};
+  // Default initial coordinates (Vadodara Baseline)
+  let currentLat = 22.3050;
+  let currentLon = 73.4802;
+  let currentAcc = 10.0;
+  let currentSpeed = 0.0;
+  let currentAlt = 35.0;
+  let currentHeading = 0.0;
+
+  // Initialize Leaflet Map
+  const map = L.map('userMap', { zoomControl: false }).setView([currentLat, currentLon], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  let userMarker = null;
+  let accuracyCircle = null;
+  let watchId = null;
+  let simTimer = null;
+  let simAngle = 0;
+  let isSharing = false;
+  let lastSendTime = 0;
+  let activeMode = 'walk';
+
+  function setMode(el, mode) {
+    document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    activeMode = mode;
+  }
+
+  function showBanner(msg, type = 'info') {
+    const el = document.getElementById('bannerNotice');
+    el.className = `banner banner-${type}`;
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideBanner() {
+    document.getElementById('bannerNotice').style.display = 'none';
+  }
+
+  // Reverse Geocoding API via OpenStreetMap Nominatim
+  let lastGeoCodeTime = 0;
+  async function fetchAddress(lat, lon) {
+    const now = Date.now();
+    if (now - lastGeoCodeTime < 10000) return;
+    lastGeoCodeTime = now;
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16`);
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.display_name || "Location resolved";
+        document.getElementById('addressText').textContent = addr.split(',').slice(0, 3).join(',');
+      }
+    } catch (e) {
+      document.getElementById('addressText').textContent = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    }
+  }
+
+  function updateMapPosition(lat, lon, accuracy = 10) {
+    const latlng = [lat, lon];
+    
+    if (!userMarker) {
+      const customIcon = L.divIcon({
+        className: 'user-location-marker',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+      userMarker = L.marker(latlng, { icon: customIcon }).addTo(map);
+      accuracyCircle = L.circle(latlng, {
+        radius: accuracy,
+        color: '#38bdf8',
+        fillColor: '#38bdf8',
+        fillOpacity: 0.15,
+        weight: 1
+      }).addTo(map);
+      map.setView(latlng, 16);
+    } else {
+      userMarker.setLatLng(latlng);
+      accuracyCircle.setLatLng(latlng);
+      accuracyCircle.setRadius(accuracy);
+    }
+    fetchAddress(lat, lon);
+  }
+
+  // Send Telemetry packet to SOC Dashboard backend
+  async function postTelemetry(lat, lon, accuracy, speed = null, heading = null, altitude = null, force = false) {
+    const now = Date.now();
+    if (!force && (now - lastSendTime < 1500)) return;
+    lastSendTime = now;
+
+    const payload = {
+      device_id: deviceId,
+      latitude: lat,
+      longitude: lon,
+      accuracy: accuracy,
+      altitude: altitude || currentAlt,
+      speed: speed != null ? speed : currentSpeed,
+      heading: heading || currentHeading,
+      timestamp: now / 1000,
+      source: "browser"
+    };
+
+    try {
+      const res = await fetch('/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        document.getElementById('valSync').textContent = new Date().toLocaleTimeString();
+      }
+    } catch (e) {}
+  }
+
+  function handleLiveLocation(pos) {
+    currentLat = pos.coords.latitude;
+    currentLon = pos.coords.longitude;
+    currentAcc = pos.coords.accuracy || 10;
+    currentSpeed = pos.coords.speed != null ? (pos.coords.speed * 3.6) : 0;
+    currentAlt = pos.coords.altitude || 35;
+    currentHeading = pos.coords.heading || 0;
+
+    document.getElementById('valLat').textContent = currentLat.toFixed(4);
+    document.getElementById('valLon').textContent = currentLon.toFixed(4);
+    document.getElementById('valAcc').textContent = currentAcc.toFixed(0) + ' m';
+    document.getElementById('valSpeed').textContent = currentSpeed.toFixed(0) + ' km/h';
+    document.getElementById('valAlt').textContent = currentAlt.toFixed(0) + ' m';
+    
+    updateMapPosition(currentLat, currentLon, currentAcc);
+    postTelemetry(currentLat, currentLon, currentAcc, currentSpeed, currentHeading, currentAlt);
+  }
+
+  function startSimulatedStream() {
+    if (simTimer) clearInterval(simTimer);
+    showBanner('Local Testing: Broadcasting telemetry stream to SOC Dashboard...', 'info');
+    
+    simTimer = setInterval(() => {
+      simAngle += 0.04;
+      const step = (activeMode === 'drive') ? 0.0006 : 0.00015;
+      currentLat = 22.3050 + (step * Math.cos(simAngle));
+      currentLon = 73.4802 + (step * Math.sin(simAngle));
+      currentAcc = 10.0;
+      currentSpeed = (activeMode === 'drive') ? 45.0 : 4.5;
+
+      document.getElementById('valLat').textContent = currentLat.toFixed(4);
+      document.getElementById('valLon').textContent = currentLon.toFixed(4);
+      document.getElementById('valAcc').textContent = currentAcc.toFixed(0) + ' m';
+      document.getElementById('valSpeed').textContent = currentSpeed.toFixed(0) + ' km/h';
+      document.getElementById('valAlt').textContent = '35 m';
+
+      updateMapPosition(currentLat, currentLon, currentAcc);
+      postTelemetry(currentLat, currentLon, currentAcc, currentSpeed, 0, 35);
+    }, 2000);
+  }
+
+  function handleLocationError(err) {
+    if (err.message && err.message.includes('secure origins') || window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      startSimulatedStream();
+    } else {
+      showBanner('Location permission required. Please allow access in browser settings.', 'warn');
+    }
+  }
+
+  // Initialize UI map position
+  updateMapPosition(currentLat, currentLon, currentAcc);
+
+  const toggleBtn = document.getElementById('toggleBtn');
+  const statusText = document.getElementById('statusText');
+
+  toggleBtn.onclick = () => {
+    if (!isSharing) {
+      isSharing = true;
+      toggleBtn.className = 'btn-primary btn-danger';
+      toggleBtn.innerHTML = '<span>⏹ Stop Location Sharing</span>';
+      statusText.innerHTML = '<span class="dot dot-active"></span> Live Broadcasting';
+      hideBanner();
+
+      // Send INSTANT heartbeat telemetry so device pops up on SOC Dashboard in 0.01s!
+      postTelemetry(currentLat, currentLon, currentAcc, currentSpeed, currentHeading, currentAlt, true);
+
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(handleLiveLocation, handleLocationError, {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 15000
+        });
+      } else {
+        startSimulatedStream();
+      }
+    } else {
+      isSharing = false;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (simTimer !== null) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+      
+      // Notify server of explicit user disconnection
+      fetch('/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId, action: 'disconnect' })
+      }).catch(() => {});
+
+      toggleBtn.className = 'btn-primary';
+      toggleBtn.innerHTML = '<span>📍 Start Location Sharing</span>';
+      statusText.innerHTML = '<span class="dot"></span> Standby';
+      document.getElementById('valSync').textContent = 'Stopped';
+    }
+  };
 </script>
 </body>
 </html>

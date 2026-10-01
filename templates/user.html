@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GPS SecureTrack | User Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Leaflet Map Engine CSS & JS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+  :root {
+    --bg-dark: #0b0e14;
+    --card-bg: #141923;
+    --card-border: #222d3d;
+    --cyan: #00f0ff;
+    --green: #00ff88;
+    --red: #ff3366;
+    --yellow: #f59e0b;
+    --text-main: #e2e8f0;
+    --text-sub: #94a3b8;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top Header Bar */
+  .header {
+    background: rgba(20, 25, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--card-border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid var(--cyan);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  .brand-text h1 {
+    font-size: 17px;
+    color: var(--cyan);
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  
+  .brand-text p {
+    font-size: 11px;
+    color: var(--text-sub);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .device-select-box {
+    background: #0f141d;
+    border: 1px solid var(--card-border);
+    color: var(--cyan);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-normal { background: rgba(0, 255, 136, 0.15); border: 1px solid var(--green); color: var(--green); }
+  .badge-spoof { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--red); color: var(--red); }
+  .badge-jam { background: rgba(245, 158, 11, 0.2); border: 1px solid var(--yellow); color: var(--yellow); }
+  .badge-offline { background: rgba(148, 163, 184, 0.15); border: 1px solid var(--text-sub); color: var(--text-sub); }
+
+  .user-profile-menu {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 12px;
+    border-left: 1px solid var(--card-border);
+    cursor: pointer;
+  }
+
+  .avatar-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  .avatar-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .role-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0, 240, 255, 0.15);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+  }
+
+  /* Layout Wrapper */
+  .layout-wrapper {
+    display: flex;
+    flex: 1;
+  }
+
+  /* Minimal Collapsible Sidebar */
+  .sidebar {
+    width: 240px;
+    background: #0f141d;
+    border-right: 1px solid var(--card-border);
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: sticky;
+    top: 63px;
+    height: calc(100vh - 63px);
+    overflow-y: auto;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 16px 8px;
+    border-bottom: 1px solid var(--card-border);
+    margin-bottom: 6px;
+  }
+  .sidebar-brand .sidebar-logo {
+    font-size: 22px;
+  }
+  .sidebar-brand .sidebar-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 0.5px;
+  }
+
+  .sidebar-divider {
+    height: 1px;
+    background: var(--card-border);
+    margin: 12px 6px;
+  }
+  
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    color: var(--text-sub);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    text-decoration: none;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: rgba(0, 240, 255, 0.08);
+    color: var(--cyan);
+    border-left: 3px solid var(--cyan);
+  }
+
+  /* Main View Container */
+  .main-content {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 1400px;
+  }
+
+  .user-tab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  .user-tab-panel.active-tab {
+    display: flex;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Welcome Bar */
+  .welcome-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 18px 22px;
+  }
+  .welcome-bar h2 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .welcome-bar p {
+    font-size: 13px;
+    color: var(--text-sub);
+  }
+
+  .btn-stream {
+    background: var(--cyan);
+    color: #0b0e14;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  /* Large Prominent Banner Card */
+  .prominent-status-banner {
+    border-radius: 16px;
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .banner-normal { background: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(20, 25, 35, 0.95) 100%); border-color: var(--green); }
+  .banner-spoof { background: linear-gradient(135deg, rgba(255, 51, 102, 0.15) 0%, rgba(20, 25, 35, 0.95) 100%); border-color: var(--red); }
+  .banner-jam { background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(20, 25, 35, 0.95) 100%); border-color: var(--yellow); }
+  .banner-offline { background: linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(20, 25, 35, 0.95) 100%); border-color: var(--text-sub); }
+
+  .banner-main-text h2 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .banner-main-text p {
+    font-size: 14px;
+    color: var(--text-sub);
+    margin-top: 6px;
+  }
+
+  /* 4 Summary Cards Grid */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  .card-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-sub);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-val {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--cyan);
+  }
+  
+  .card-sub {
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+
+  /* Main Content Grid */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 992px) {
+    .content-grid { grid-template-columns: 1fr; }
+    .sidebar { width: 70px; }
+    .nav-item span { display: none; }
+    .sidebar-brand .sidebar-title { display: none; }
+  }
+
+  /* Map Panel */
+  .map-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    overflow: hidden;
+    height: 420px;
+    position: relative;
+  }
+  .map-panel.large-map {
+    height: 520px;
+  }
+  .user-map-div {
+    width: 100%;
+    height: 100%;
+    background: #0b0e14;
+  }
+
+  .map-controls-bar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 500;
+    display: flex;
+    gap: 8px;
+  }
+  .btn-map-ctrl {
+    background: rgba(20, 25, 35, 0.9);
+    border: 1px solid var(--card-border);
+    color: var(--cyan);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+  }
+
+  /* Floating Dynamic Location Summary Overlay Card */
+  .location-summary-card {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 600;
+    background: rgba(20, 25, 35, 0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    min-width: 220px;
+    max-width: 290px;
+    pointer-events: auto;
+  }
+  .summary-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--cyan);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .summary-place {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.3;
+  }
+  .summary-region {
+    font-size: 12px;
+    color: var(--text-sub);
+    margin-top: 1px;
+  }
+  .summary-coords {
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--cyan);
+    margin-top: 4px;
+    border-top: 1px dashed var(--card-border);
+    padding-top: 4px;
+  }
+
+  /* Legally Compliant Leaflet Attribution Styling */
+  .leaflet-control-attribution {
+    background: rgba(15, 20, 29, 0.85) !important;
+    color: var(--text-sub) !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    border-radius: 4px 0 0 0 !important;
+    backdrop-filter: blur(4px);
+  }
+  .leaflet-control-attribution a {
+    color: var(--cyan) !important;
+    text-decoration: underline !important;
+  }
+
+  /* Compact Security Check Box */
+  .security-status-box {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sec-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #0f141d;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+  }
+
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  /* Data Table */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .data-table th, .data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .data-table th {
+    color: var(--text-sub);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Internal Tabs Bar */
+  .sub-tabs-bar {
+    display: flex;
+    gap: 12px;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .sub-tab-btn {
+    padding: 8px 18px;
+    background: #0f141d;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text-sub);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sub-tab-btn.active-sub-tab {
+    background: rgba(0, 240, 255, 0.12);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  /* Profile Layout */
+  .profile-header-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 28px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  
+  .profile-avatar-large {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.12);
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 800;
+    position: relative;
+    overflow: hidden;
+  }
+  .profile-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .btn-avatar-upload {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: rgba(11, 14, 20, 0.85);
+    color: var(--cyan);
+    font-size: 10px;
+    text-align: center;
+    padding: 2px 0;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  /* Forms & Toggles */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #334155; transition: .3s; border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background-color: white; transition: .3s; border-radius: 50%;
+  }
+  input:checked + .slider { background-color: var(--green); }
+  input:checked + .slider:before { transform: translateX(20px); }
+
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-sub);
+    margin-bottom: 4px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0f141d;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+  }
+  .form-input:focus { border-color: var(--cyan); }
+
+  .btn-action {
+    padding: 10px 20px;
+    background: var(--cyan);
+    color: #0b0e14;
+    font-weight: 700;
+    font-size: 13px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-action:hover { opacity: 0.9; }
+
+  /* Google Maps Style Location Puck & Pulsing Halo */
+  .google-location-puck {
+    width: 22px;
+    height: 22px;
+    background: #4285F4; /* Google Maps Blue */
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(66, 133, 244, 0.8), 0 2px 6px rgba(0,0,0,0.5);
+    position: relative;
+    cursor: pointer;
+  }
+  .google-location-puck::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: -7px;
+    width: 30px;
+    height: 30px;
+    border: 2px solid #4285F4;
+    border-radius: 50%;
+    animation: googlePulse 2.2s infinite ease-out;
+    opacity: 0;
+  }
+  @keyframes googlePulse {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    70% { transform: scale(2.0); opacity: 0.15; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  /* Modal Logout Dialog */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(11, 14, 20, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-box {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 28px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  }
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  .btn-modal-cancel {
+    padding: 8px 18px;
+    background: #0f141d;
+    border: 1px solid var(--card-border);
+    color: var(--text-main);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .btn-modal-confirm {
+    padding: 8px 18px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .user-marker {
+    width: 16px;
+    height: 16px;
+    background: var(--cyan);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--cyan);
+  }
+</style>
+</head>
+<body>
+
+<!-- Header Bar -->
+<div class="header">
+  <div class="brand" onclick="switchTab('tab-overview', 'nav-overview', '/user')">
+    <div class="brand-logo">🛡️</div>
+    <div class="brand-text">
+      <h1>GPS SecureTrack</h1>
+      <p>User Security & GPS Status Portal</p>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <select class="device-select-box" id="userDeviceSelect">
+      <option value="">Detecting active session...</option>
+    </select>
+
+    <div class="status-badge badge-normal" id="headerStatusBadge">
+      <span id="badgeDot">●</span> <span id="headerStatusText">ONLINE</span>
+    </div>
+
+    <div class="user-profile-menu" onclick="switchTab('tab-profile', 'nav-profile', '/user/profile')">
+      <div class="avatar-badge" id="hdrAvatarBadge">
+        {{ session.get('name', 'U')[0] | upper }}
+      </div>
+      <span style="font-size:13px; font-weight:600;" id="hdrUserName">{{ session.get('name', 'User') }}</span>
+      <span class="role-pill">{{ session.get('role', 'USER') }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Layout Wrapper -->
+<div class="layout-wrapper">
+
+  <!-- Minimal Sidebar Navigation (Exact Specification) -->
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-logo">🛡️</span>
+      <span class="sidebar-title">GPS SecureTrack</span>
+    </div>
+
+    <a href="/user" class="nav-item active" id="nav-overview" onclick="switchTab('tab-overview', this, '/user', event)"><span>📊 Dashboard</span></a>
+    <a href="/user/location" class="nav-item" id="nav-location" onclick="switchTab('tab-location', this, '/user/location', event)"><span>📍 My Location</span></a>
+    <a href="/user/security" class="nav-item" id="nav-security" onclick="switchTab('tab-security', this, '/user/security', event)"><span>🛡 Security</span></a>
+    <a href="/user/history" class="nav-item" id="nav-history" onclick="switchTab('tab-history', this, '/user/history', event)"><span>📋 History</span></a>
+    <a href="/user/alerts" class="nav-item" id="nav-alerts" onclick="switchTab('tab-alerts', this, '/user/alerts', event)"><span>🔔 Alerts</span></a>
+
+    <div class="sidebar-divider"></div>
+
+    <a href="/user/profile" class="nav-item" id="nav-profile" onclick="switchTab('tab-profile', this, '/user/profile', event)"><span>👤 Profile</span></a>
+    <a href="#" class="nav-item" style="color:var(--red);" onclick="openLogoutModal(event)"><span>🚪 Logout</span></a>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+
+    <!-- 1. DASHBOARD TAB -->
+    <div class="user-tab-panel active-tab" id="tab-overview">
+      <div class="welcome-bar">
+        <div>
+          <h2>Welcome back, <span style="color:var(--cyan)" id="dispUserName">{{ session.get('name', 'User') }}</span></h2>
+          <p>Your personal GPS security and location status.</p>
+        </div>
+      </div>
+
+      <!-- Main Prominent Security Status Card -->
+      <div class="prominent-status-banner banner-normal" id="mainSecBanner">
+        <div class="banner-main-text">
+          <h2 id="bannerStatusTitle">🟢 GPS SECURE</h2>
+          <p id="bannerStatusSub">Your GPS is operating normally.</p>
+        </div>
+        <div style="font-size:12px; color:var(--text-sub); text-align:right;">
+          <span>Last verified:</span><br>
+          <strong style="color:var(--cyan)" id="bannerVerifiedTime">Just now</strong>
+        </div>
+      </div>
+
+      <!-- 4 Quick Cards -->
+      <div class="summary-grid">
+        <div class="card">
+          <div class="card-title">SECURITY STATUS <span>🛡️</span></div>
+          <div class="card-val" id="cardSecStatus" style="color:var(--green)">NORMAL</div>
+          <div class="card-sub" id="cardSecSub">All signals clear</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CURRENT LOCATION <span>📍</span></div>
+          <div class="card-val" id="cardCoords" style="font-size:17px">22.3050, 73.4802</div>
+          <div class="card-sub" id="cardCoordsSub">Accuracy: 10 m • Updated 1s ago</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">GPS SIGNAL <span>🛰️</span></div>
+          <div class="card-val" id="cardSignal">9 Satellites</div>
+          <div class="card-sub" id="cardSignalSub">C/N0: 42 dB-Hz • HDOP: 0.9</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">MOVEMENT <span>🚗</span></div>
+          <div class="card-val" id="cardSpeed">0 km/h</div>
+          <div class="card-sub" id="cardMovementSub">Heading: 0° • Altitude: 35 m</div>
+        </div>
+      </div>
+
+      <!-- Google Maps Style Geolocation Map Card (Dashboard) -->
+      <div class="card" style="padding:0; margin-top:20px; margin-bottom:20px; overflow:hidden; position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#0f141d; padding:12px 18px; border-bottom:1px solid var(--card-border);">
+          <div style="font-weight:700; font-size:14px; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+            <span>🗺️ Live Geolocation Map</span>
+            <span style="font-size:11px; color:var(--cyan); background:rgba(0,240,255,0.1); padding:2px 8px; border-radius:12px; border:1px solid rgba(0,240,255,0.3);">Google Maps Style</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <select class="btn-map-ctrl" onchange="setMapView(overviewMap, 'ov', this.value)" style="background:#0f141d; color:var(--cyan); border:1px solid var(--card-border); padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; outline:none;">
+              <option value="roadmap">🗺️ Roadmap View (Google Style with Location Names)</option>
+              <option value="satellite">🛰️ Satellite View (With Location Labels)</option>
+              <option value="terrain">🏔️ Terrain View (Topography & Roads)</option>
+            </select>
+            <button class="btn-map-ctrl" onclick="locateUserMap(overviewMap)">📍 Center My Location</button>
+            <button class="btn-map-ctrl" onclick="requestBrowserGPS()">📡 Live GPS Stream</button>
+            <button class="btn-map-ctrl" onclick="toggleAutoFollow()" id="btnAutoFollow">🎯 Follow: ON</button>
+          </div>
+        </div>
+        <div style="position:relative; width:100%; height:380px;">
+          <div id="overviewMap" class="user-map-div" style="height:100%; width:100%;"></div>
+
+          <!-- Dynamic Location Summary Overlay Card -->
+          <div class="location-summary-card">
+            <div class="summary-label">Current Location</div>
+            <div class="summary-place" id="summaryPlaceText">Resolving location...</div>
+            <div class="summary-region" id="summaryRegionText">—</div>
+            <div class="summary-coords" id="summaryCoordsText">22.3050, 73.4802</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location Metrics & Security Check Grid -->
+      <div class="content-grid">
+        <div class="card" style="padding:22px; justify-content:space-between;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px;">
+            <div class="card-title" style="margin:0; font-size:13px;">Location Telemetry Details <span>📍</span></div>
+            <button class="btn-action" style="padding:4px 12px; font-size:12px;" onclick="requestBrowserGPS()">📡 Stream Geolocation</button>
+          </div>
+          
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-top:12px; font-size:13px;">
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Latitude</span>
+              <strong id="dashLatVal" style="font-family:monospace; color:var(--cyan); font-size:15px;">22.3050° N</strong>
+            </div>
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Longitude</span>
+              <strong id="dashLonVal" style="font-family:monospace; color:var(--cyan); font-size:15px;">73.4802° E</strong>
+            </div>
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Accuracy Radius</span>
+              <strong id="dashAccVal" style="color:var(--green)">10.0 meters</strong>
+            </div>
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Elevation / Altitude</span>
+              <strong id="dashAltVal">35.0 meters</strong>
+            </div>
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Ground Speed</span>
+              <strong id="dashSpeedVal">0 km/h</strong>
+            </div>
+            <div style="background:#0f141d; padding:12px; border-radius:8px; border:1px solid var(--card-border);">
+              <span style="color:var(--text-sub); display:block; font-size:11px; text-transform:uppercase;">Heading Vector</span>
+              <strong id="dashHeadingVal">0° (North)</strong>
+            </div>
+          </div>
+
+          <div style="font-size:12px; color:var(--text-sub); display:flex; justify-content:space-between; margin-top:12px; border-top:1px dashed var(--card-border); padding-top:10px;">
+            <span>Sync Status: <strong style="color:var(--green)" id="dashSyncStatus">🟢 Telemetry Active</strong></span>
+            <span>Last Update: <strong style="color:var(--cyan)" id="dashLastUpdateSec">Just now</strong></span>
+          </div>
+        </div>
+
+        <div class="security-status-box">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:8px;">Security Check</h3>
+          <div class="sec-checklist" id="compactSecChecklist">
+            <div class="check-item"><span style="color:var(--green)">✓</span> <span>GPS satellite lock</span></div>
+            <div class="check-item"><span style="color:var(--green)">✓</span> <span>GPS signal normal</span></div>
+            <div class="check-item"><span style="color:var(--green)">✓</span> <span>No location spoofing detected</span></div>
+            <div class="check-item"><span style="color:var(--green)">✓</span> <span>No signal jamming</span></div>
+            <div class="check-item"><span style="color:var(--green)">✓</span> <span>Telemetry connected</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity Events (Bottom of Dashboard) -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px;">
+          <div class="card-title" style="margin:0;">Recent Activity <span>📜</span></div>
+          <button class="btn-action" style="padding:4px 12px; font-size:12px;" onclick="switchTab('tab-history', 'nav-history', '/user/history')">View History</button>
+        </div>
+        <div id="recentEventsList" style="display:flex; flex-direction:column; gap:10px; margin-top:8px; font-size:13px;">
+          <div style="display:flex; gap:12px; align-items:center;"><span style="color:var(--text-sub); font-family:monospace;">Just now</span> <span style="color:var(--green)">🟢 GPS telemetry received</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. MY LOCATION TAB -->
+    <div class="user-tab-panel" id="tab-location">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="font-size:20px; font-weight:700;">📍 My Live Location</h2>
+        <div class="status-badge badge-normal" id="locActiveStatus">🟢 Live location active</div>
+      </div>
+
+      <div class="map-panel large-map" style="position:relative;">
+        <div class="map-controls-bar">
+          <select class="btn-map-ctrl" onchange="setMapView(fullLocationMap, 'loc', this.value)" style="background:#0f141d; color:var(--cyan); border:1px solid var(--card-border); padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; outline:none;">
+            <option value="roadmap">🗺️ Roadmap View (Google Style with Location Names)</option>
+            <option value="satellite">🛰️ Satellite View (With Location Labels)</option>
+            <option value="terrain">🏔️ Terrain View (Topography & Roads)</option>
+          </select>
+          <button class="btn-map-ctrl" onclick="locateUserMap(fullLocationMap)">📍 Center My Location</button>
+          <button class="btn-map-ctrl" onclick="toggleAutoFollow()" id="btnAutoFollow">🎯 Follow: ON</button>
+        </div>
+        <div id="fullLocationMap" class="user-map-div"></div>
+
+        <!-- Dynamic Location Summary Overlay Card -->
+        <div class="location-summary-card">
+          <div class="summary-label">Current Location</div>
+          <div class="summary-place" id="summaryPlaceTextLoc">Resolving location...</div>
+          <div class="summary-region" id="summaryRegionTextLoc">—</div>
+          <div class="summary-coords" id="summaryCoordsTextLoc">22.3050, 73.4802</div>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="card">
+          <div class="card-title">CURRENT COORDINATES</div>
+          <div class="card-val" id="locFullCoords">22.3050°, 73.4802°</div>
+          <div class="card-sub" id="locFullTime">Updated just now</div>
+        </div>
+        <div class="card">
+          <div class="card-title">ACCURACY RADIUS</div>
+          <div class="card-val" id="locFullAccuracy">10.0 meters</div>
+          <div class="card-sub">High Precision Telemetry</div>
+        </div>
+        <div class="card">
+          <div class="card-title">SPEED & HEADING</div>
+          <div class="card-val" id="locFullSpeed">0 km/h (0°)</div>
+          <div class="card-sub" id="locFullAlt">Altitude: 35 m</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. SECURITY TAB -->
+    <div class="user-tab-panel" id="tab-security">
+      <h2 style="font-size:20px; font-weight:700;">🛡 Security Status Diagnostics</h2>
+
+      <div class="prominent-status-banner banner-normal" id="secDiagBanner">
+        <div class="banner-main-text">
+          <h2 id="secDiagTitle">🟢 GPS SECURE</h2>
+          <p id="secDiagSub">Your GPS system is operating normally without malicious interference.</p>
+        </div>
+        <div>
+          <button class="btn-action" onclick="toggleTechDetails()">View Technical Details</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Receiver Health Indicators</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; font-size:14px; margin-top:8px;">
+          <div style="background:#0f141d; padding:14px; border-radius:10px; border:1px solid var(--card-border); display:flex; justify-content:space-between;">
+            <span>GPS SIGNAL</span> <strong style="color:var(--green)">✓ Normal</strong>
+          </div>
+          <div style="background:#0f141d; padding:14px; border-radius:10px; border:1px solid var(--card-border); display:flex; justify-content:space-between;">
+            <span>LOCATION</span> <strong style="color:var(--green)">✓ Normal</strong>
+          </div>
+          <div style="background:#0f141d; padding:14px; border-radius:10px; border:1px solid var(--card-border); display:flex; justify-content:space-between;">
+            <span>MOVEMENT</span> <strong style="color:var(--green)">✓ Normal</strong>
+          </div>
+          <div style="background:#0f141d; padding:14px; border-radius:10px; border:1px solid var(--card-border); display:flex; justify-content:space-between;">
+            <span>SATELLITES</span> <strong style="color:var(--green)">✓ Normal</strong>
+          </div>
+          <div style="background:#0f141d; padding:14px; border-radius:10px; border:1px solid var(--card-border); display:flex; justify-content:space-between;">
+            <span>TELEMETRY</span> <strong style="color:var(--green)">✓ Connected</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Details Collapsible -->
+      <div class="card" id="techDetailsBox" style="display:none; background:#0b0e14; border-color:var(--cyan);">
+        <div class="card-title" style="color:var(--cyan)">TECHNICAL DIAGNOSTICS LOG</div>
+        <div style="font-family:monospace; font-size:12px; color:var(--text-sub); line-height:1.6; display:flex; flex-direction:column; gap:6px;" id="techDetailsContent">
+          <div>• Spatial Jump Threshold: 100.0 m (Observed: 0.0 m)</div>
+          <div>• Velocity Threshold: 150.0 km/h (Observed: 0.0 km/h)</div>
+          <div>• Carrier-to-Noise Ratio (C/N0): 42.0 dB-Hz</div>
+          <div>• Satellite Lock Count: 9 satellites active</div>
+          <div>• Threat Engine Classification Score: 0.02 (Low Risk)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. HISTORY TAB (With 3 Sub-tabs: ATTACKS | ACTIVITY | LOCATIONS) -->
+    <div class="user-tab-panel" id="tab-history">
+      <h2 style="font-size:20px; font-weight:700;">📋 System History Logs</h2>
+
+      <div class="sub-tabs-bar">
+        <button class="sub-tab-btn active-sub-tab" onclick="switchSubTab('subtab-attacks', this)">ATTACKS</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('subtab-activity', this)">ACTIVITY</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('subtab-locations', this)">LOCATIONS</button>
+      </div>
+
+      <!-- Attacks Sub-tab -->
+      <div id="subtab-attacks" class="sub-tab-content">
+        <div class="card">
+          <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <button class="filter-btn active-filter" onclick="filterAttacks('ALL', this)">All</button>
+            <button class="filter-btn" onclick="filterAttacks('SPOOFING', this)">Spoofing</button>
+            <button class="filter-btn" onclick="filterAttacks('JAMMING', this)">Jamming</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Attack Type</th>
+                <th>Date & Time</th>
+                <th>Duration</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="histAttacksBody">
+              <tr><td colspan="6" style="color:var(--text-sub)">No security attacks have been recorded for your device.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Activity Sub-tab -->
+      <div id="subtab-activity" class="sub-tab-content" style="display:none;">
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Event Type</th>
+                <th>Description</th>
+                <th>Device ID</th>
+              </tr>
+            </thead>
+            <tbody id="histActivityBody">
+              <tr><td colspan="4" style="color:var(--text-sub)">Loading activity logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Locations Sub-tab -->
+      <div id="subtab-locations" class="sub-tab-content" style="display:none;">
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Speed</th>
+                <th>GPS Status</th>
+              </tr>
+            </thead>
+            <tbody id="histLocationsBody">
+              <tr><td colspan="5" style="color:var(--text-sub)">Waiting for location telemetry...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. ALERTS TAB -->
+    <div class="user-tab-panel" id="tab-alerts">
+      <h2 style="font-size:20px; font-weight:700;">🔔 Security Alerts Center</h2>
+
+      <!-- Active Alerts Section -->
+      <div class="card">
+        <div class="card-title">ACTIVE ALERTS</div>
+        <div id="activeAlertsContainer" style="margin-top:8px;">
+          <div style="background:#0f141d; padding:16px; border-radius:10px; border:1px solid var(--card-border); color:var(--green); font-size:13px; font-weight:600;">
+            ✓ No active security alerts
+          </div>
+        </div>
+      </div>
+
+      <!-- Alert History Section -->
+      <div class="card">
+        <div class="card-title">ALERT HISTORY</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Alert Explanation</th>
+              <th>Timestamp</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="alertsHistoryBody">
+            <tr><td colspan="4" style="color:var(--text-sub)">No security alerts recorded. Your GPS signal is operating normally.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. PROFILE TAB (Comprehensive Layout) -->
+    <div class="user-tab-panel" id="tab-profile">
+      
+      <!-- Top Large Profile Header -->
+      <div class="profile-header-card">
+        <div class="profile-avatar-large" id="profAvatarCircle">
+          <span id="profAvatarInitials">{{ session.get('name', 'V')[0] | upper }}</span>
+          <label class="btn-avatar-upload" for="avatarFileInput">Edit</label>
+          <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarUpload(event)">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <h2 style="font-size:22px; font-weight:800;" id="profDispName">{{ session.get('name', 'Vishnu') }}</h2>
+          <p style="font-size:13px; color:var(--text-sub);" id="profDispSub">Username: <strong>{{ session.get('username', 'user') }}</strong> • ID: <span style="color:var(--cyan); font-family:monospace;" id="profDispId">{{ session.get('user_id', 'USER-001') }}</span></p>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+            <span class="role-pill">User Account</span>
+            <span class="status-badge badge-normal" style="padding:3px 10px; font-size:11px;">🟢 Account Active</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards Grid Below Header -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+        
+        <!-- Personal Information -->
+        <div class="card">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">Personal Information</h3>
+          <form id="profileForm" onsubmit="updateProfile(event)" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" id="profName" class="form-input" value="{{ session.get('name', '') }}" required>
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input type="email" id="profEmail" class="form-input" value="{{ session.get('email', '') }}" required>
+            </div>
+            <div class="form-group">
+              <label>Assigned Device Identifier</label>
+              <input type="text" id="profDeviceId" class="form-input" value="{{ session.get('device_id', '') }}">
+            </div>
+            <button type="submit" class="btn-action">Edit Profile</button>
+          </form>
+        </div>
+
+        <!-- Account Security -->
+        <div class="card">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">Account Security</h3>
+          <form id="passwordForm" onsubmit="updatePassword(event)" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="form-group">
+              <label>Current Password</label>
+              <input type="password" id="passOld" class="form-input" required placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="passNew" class="form-input" required placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label>Confirm Password</label>
+              <input type="password" id="passConfirm" class="form-input" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn-action" style="background:var(--card-border); color:var(--text-main);">Change Password</button>
+          </form>
+        </div>
+
+        <!-- My Device (Inside Profile) -->
+        <div class="card">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">My Device</h3>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between;"><span>Device ID:</span> <strong id="profDevId" style="font-family:monospace; color:var(--cyan)">--</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Connection Status:</span> <strong style="color:var(--green)">🟢 Connected</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>GPS Security:</span> <strong style="color:var(--green)">🟢 Normal</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Telemetry Feed:</span> <strong style="color:var(--green)">🟢 Receiving</strong></div>
+          </div>
+        </div>
+
+        <!-- Privacy & Location (Inside Profile) -->
+        <div class="card">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">Privacy & Location</h3>
+          <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong>Location Monitoring</strong>
+                <p style="font-size:11px; color:var(--text-sub)">🟢 Active</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggleMonitoring" checked onchange="togglePrivacySetting()">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong>GPS Security Monitoring</strong>
+                <p style="font-size:11px; color:var(--text-sub)">🟢 Active</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggleSharing" checked onchange="togglePrivacySetting()">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Preferences -->
+        <div class="card">
+          <h3 style="font-size:15px; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">Notification Preferences</h3>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between;"><span>Security Notifications</span> <strong style="color:var(--green)">ON</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Location Alerts</span> <strong style="color:var(--green)">ON</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Attack Notifications</span> <strong style="color:var(--green)">ON</strong></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal-overlay" id="logoutModal">
+  <div class="modal-box">
+    <h3 style="font-size:18px; margin-bottom:8px;">Log Out Confirmation</h3>
+    <p style="font-size:13px; color:var(--text-sub);">Are you sure you want to log out of GPS SecureTrack?</p>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeLogoutModal()">Cancel</button>
+      <a href="/logout" class="btn-modal-confirm" style="text-decoration:none; display:inline-block; line-height:22px;">Logout</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedDevice = null;
+  let knownDevices = [];
+  let overviewMap = null, fullLocationMap = null;
+  let ovMarker = null, locMarker = null;
+  let ovCircle = null, locCircle = null;
+  let ovPoly = null, locPoly = null;
+  let allAttacks = [];
+
+  function switchTab(tabId, navElOrId, urlPath, event) {
+    if (event) event.preventDefault();
+
+    document.querySelectorAll('.sidebar .nav-item').forEach(el => el.classList.remove('active'));
+    if (typeof navElOrId === 'string') {
+      const el = document.getElementById(navElOrId);
+      if (el) el.classList.add('active');
+    } else if (navElOrId) {
+      navElOrId.classList.add('active');
+    }
+
+    document.querySelectorAll('.user-tab-panel').forEach(panel => panel.classList.remove('active-tab'));
+    const targetPanel = document.getElementById(tabId);
+    if (targetPanel) targetPanel.classList.add('active-tab');
+
+    if (urlPath && window.location.pathname !== urlPath) {
+      history.pushState(null, '', urlPath);
+    }
+
+    setTimeout(() => {
+      if (overviewMap) overviewMap.invalidateSize();
+      if (fullLocationMap) fullLocationMap.invalidateSize();
+    }, 100);
+  }
+
+  function switchSubTab(subTabId, btn) {
+    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active-sub-tab'));
+    if (btn) btn.classList.add('active-sub-tab');
+
+    document.querySelectorAll('.sub-tab-content').forEach(c => c.style.display = 'none');
+    const targetContent = document.getElementById(subTabId);
+    if (targetContent) targetContent.style.display = 'block';
+  }
+
+  function routeFromUrl() {
+    const p = window.location.pathname;
+    if (p.includes('/location-history') || p.includes('/history')) switchTab('tab-history', 'nav-history', null);
+    else if (p.includes('/location')) switchTab('tab-location', 'nav-location', null);
+    else if (p.includes('/security')) switchTab('tab-security', 'nav-security', null);
+    else if (p.includes('/attacks')) switchTab('tab-history', 'nav-history', null);
+    else if (p.includes('/alerts')) switchTab('tab-alerts', 'nav-alerts', null);
+    else if (p.includes('/profile')) switchTab('tab-profile', 'nav-profile', null);
+    else switchTab('tab-overview', 'nav-overview', null);
+  }
+
+  window.addEventListener('popstate', routeFromUrl);
+  window.addEventListener('DOMContentLoaded', () => {
+    initMaps();
+    routeFromUrl();
+    setTimeout(() => {
+      if (overviewMap) overviewMap.invalidateSize();
+      if (fullLocationMap) fullLocationMap.invalidateSize();
+    }, 250);
+  });
+
+  let mapTileLayers = { ov: {}, loc: {} };
+  let autoFollowUser = true;
+
+  function buildTileLayers() {
+    return {
+      roadmap: L.layerGroup([
+        L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps</a>'
+        })
+      ]),
+      satellite: L.layerGroup([
+        L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps Satellite</a>'
+        })
+      ]),
+      terrain: L.layerGroup([
+        L.tileLayer('https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps Terrain</a>'
+        })
+      ])
+    };
+  }
+
+  function initMaps() {
+    const defaultCoords = [22.3050, 73.4802];
+
+    if (document.getElementById('overviewMap') && !overviewMap) {
+      overviewMap = L.map('overviewMap', { zoomControl: true }).setView(defaultCoords, 16);
+      mapTileLayers['ov'] = buildTileLayers();
+      mapTileLayers['ov'].roadmap.addTo(overviewMap);
+    }
+
+    if (document.getElementById('fullLocationMap') && !fullLocationMap) {
+      fullLocationMap = L.map('fullLocationMap', { zoomControl: true }).setView(defaultCoords, 16);
+      mapTileLayers['loc'] = buildTileLayers();
+      mapTileLayers['loc'].roadmap.addTo(fullLocationMap);
+    }
+  }
+
+  function setMapView(mapObj, key, styleName) {
+    if (!mapObj || !mapTileLayers[key]) return;
+    Object.values(mapTileLayers[key]).forEach(layerGroup => {
+      if (mapObj.hasLayer(layerGroup)) mapObj.removeLayer(layerGroup);
+    });
+    if (mapTileLayers[key][styleName]) {
+      mapTileLayers[key][styleName].addTo(mapObj);
+      setTimeout(() => mapObj.invalidateSize(), 50);
+    }
+  }
+
+  let lastGeocodeLat = null, lastGeocodeLon = null, cachedAddress = null;
+  let isGeocoding = false;
+
+  async function updateReverseGeocode(lat, lon) {
+    if (lastGeocodeLat !== null && lastGeocodeLon !== null) {
+      const dist = Math.hypot(lat - lastGeocodeLat, lon - lastGeocodeLon) * 111000;
+      if (dist < 30 && cachedAddress) {
+        renderLocationSummary(cachedAddress, lat, lon);
+        return;
+      }
+    }
+
+    if (isGeocoding) return;
+    isGeocoding = true;
+    lastGeocodeLat = lat;
+    lastGeocodeLon = lon;
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        const locality = addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || addr.county || addr.district || addr.municipality || "Current Area";
+        const state = addr.state || addr.region || addr.state_district || "";
+        const country = addr.country || "";
+
+        cachedAddress = { locality, state, country, full: data.display_name };
+        renderLocationSummary(cachedAddress, lat, lon);
+      } else {
+        renderLocationSummary({ locality: "Location Verified", state: "", country: "" }, lat, lon);
+      }
+    } catch (e) {
+      renderLocationSummary({ locality: "Coordinates Active", state: "", country: "" }, lat, lon);
+    } finally {
+      isGeocoding = false;
+    }
+  }
+
+  function renderLocationSummary(info, lat, lon) {
+    // Update Overview Card Overlay
+    const p1 = document.getElementById('summaryPlaceText');
+    const r1 = document.getElementById('summaryRegionText');
+    const c1 = document.getElementById('summaryCoordsText');
+    if (p1) p1.textContent = info.locality;
+    if (r1) r1.textContent = [info.state, info.country].filter(Boolean).join(', ') || 'GPS Verified';
+    if (c1) c1.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+    // Update Loc Card Overlay
+    const p2 = document.getElementById('summaryPlaceTextLoc');
+    const r2 = document.getElementById('summaryRegionTextLoc');
+    const c2 = document.getElementById('summaryCoordsTextLoc');
+    if (p2) p2.textContent = info.locality;
+    if (r2) r2.textContent = [info.state, info.country].filter(Boolean).join(', ') || 'GPS Verified';
+    if (c2) c2.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+    // Dynamic Leaflet Marker Popups
+    const popupContent = `
+      <div style="font-family:sans-serif; padding:4px;">
+        <span style="color:#4285F4; font-weight:700; font-size:11px; text-transform:uppercase; display:block;">Current Location</span>
+        <strong style="font-size:14px; color:#111; display:block; margin-top:2px;">${info.locality}</strong>
+        <div style="font-size:12px; color:#555;">${[info.state, info.country].filter(Boolean).join(', ')}</div>
+        <div style="font-family:monospace; font-size:11px; color:#0066cc; margin-top:4px; border-top:1px solid #ddd; padding-top:2px;">${lat.toFixed(4)}°, ${lon.toFixed(4)}°</div>
+      </div>
+    `;
+
+    if (ovMarker) ovMarker.bindPopup(popupContent);
+    if (locMarker) locMarker.bindPopup(popupContent);
+  }
+
+  function toggleAutoFollow() {
+    autoFollowUser = !autoFollowUser;
+    const btn = document.getElementById('btnAutoFollow');
+    if (btn) btn.textContent = autoFollowUser ? '🎯 Follow: ON' : '🎯 Follow: OFF';
+  }
+
+  function locateUserMap(mapObj) {
+    if (!mapObj) return;
+    const targetMarker = locMarker || ovMarker;
+    if (targetMarker) {
+      mapObj.flyTo(targetMarker.getLatLng(), 17, { animate: true, duration: 1.2 });
+    }
+  }
+
+  let liveGpsWatchId = null;
+
+  function requestBrowserGPS() {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    if (liveGpsWatchId !== null) {
+      navigator.geolocation.clearWatch(liveGpsWatchId);
+      liveGpsWatchId = null;
+      alert('Live GPS streaming stopped.');
+      return;
+    }
+
+    liveGpsWatchId = navigator.geolocation.watchPosition(pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy || 10;
+      const speed = pos.coords.speed != null ? pos.coords.speed * 3.6 : 0;
+      const heading = pos.coords.heading || 0;
+      const altitude = pos.coords.altitude || 35;
+
+      const streamDeviceId = (selectedDevice && selectedDevice !== 'SOC-HOST') ? selectedDevice : ('{{ session.get("device_id", "USER-001") }}' !== 'SOC-HOST' ? '{{ session.get("device_id", "USER-001") }}' : 'USER-001');
+
+      fetch('/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_id: streamDeviceId,
+          latitude: lat,
+          longitude: lon,
+          accuracy: accuracy,
+          speed_kmh: speed,
+          heading: heading,
+          altitude: altitude,
+          source: 'browser'
+        })
+      }).then(() => {
+        pollUserDashboard();
+        if (overviewMap) overviewMap.flyTo([lat, lon], 17);
+        if (fullLocationMap) fullLocationMap.flyTo([lat, lon], 17);
+      });
+    }, err => {
+      alert('Could not access device GPS location: ' + err.message);
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+
+    alert('📡 Live GPS streaming activated! Your real-time location is now streaming to the Dashboard.');
+  }
+
+  function toggleTechDetails() {
+    const box = document.getElementById('techDetailsBox');
+    box.style.display = (box.style.display === 'none') ? 'flex' : 'none';
+  }
+
+  function openLogoutModal(e) {
+    if (e) e.preventDefault();
+    document.getElementById('logoutModal').style.display = 'flex';
+  }
+
+  function closeLogoutModal() {
+    document.getElementById('logoutModal').style.display = 'none';
+  }
+
+  function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const dataUrl = evt.target.result;
+      document.getElementById('profAvatarCircle').innerHTML = `<img src="${dataUrl}" alt="Avatar"><label class="btn-avatar-upload" for="avatarFileInput">Edit</label>`;
+      document.getElementById('hdrAvatarBadge').innerHTML = `<img src="${dataUrl}" alt="Avatar">`;
+      // Save via API
+      fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: dataUrl })
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function filterAttacks(type, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active-filter'));
+    if (btn) btn.classList.add('active-filter');
+
+    let filtered = allAttacks;
+    if (type !== 'ALL') {
+      filtered = allAttacks.filter(a => a.type === type);
+    }
+
+    renderAttacksTable(filtered);
+  }
+
+  function renderAttacksTable(attacks) {
+    if (attacks && attacks.length) {
+      document.getElementById('histAttacksBody').innerHTML = attacks.map(a => `
+        <tr>
+          <td><strong style="color:${a.type==='SPOOFING'?'var(--red)':'var(--yellow)'}">${a.type}</strong></td>
+          <td>${a.start_time}</td>
+          <td>${a.duration}</td>
+          <td><span style="color:var(--red)">High</span></td>
+          <td><span style="color:var(--cyan)">${a.mitigation_status}</span></td>
+          <td><button class="btn-map-ctrl" onclick="alert('Attack details:\\nType: ${a.type}\\nDuration: ${a.duration}\\nPre: (${a.pre_lat}, ${a.pre_lon})\\nPost: (${a.post_lat}, ${a.post_lon})')">View Details</button></td>
+        </tr>
+      `).join('');
+    } else {
+      document.getElementById('histAttacksBody').innerHTML = '<tr><td colspan="6" style="color:var(--text-sub)">No security attacks have been recorded for your device.</td></tr>';
+    }
+  }
+
+  async function togglePrivacySetting() {
+    const isMonitoring = document.getElementById('toggleMonitoring').checked;
+    const isSharing = document.getElementById('toggleSharing').checked;
+    try {
+      await fetch('/api/user/privacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: selectedDevice, monitoring: isMonitoring, sharing: isSharing })
+      });
+    } catch(e) {}
+  }
+
+  async function updateProfile(e) {
+    e.preventDefault();
+    const name = document.getElementById('profName').value;
+    const email = document.getElementById('profEmail').value;
+    const device_id = document.getElementById('profDeviceId').value;
+
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, device_id })
+      });
+      const data = await res.json();
+      alert(data.message || 'Profile updated!');
+      if (data.success) location.reload();
+    } catch(err) { alert('Error updating profile'); }
+  }
+
+  async function updatePassword(e) {
+    e.preventDefault();
+    const old_password = document.getElementById('passOld').value;
+    const new_password = document.getElementById('passNew').value;
+    const confirm = document.getElementById('passConfirm').value;
+
+    if (new_password !== confirm) {
+      alert('New passwords do not match!');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password, new_password })
+      });
+      const data = await res.json();
+      alert(data.message || 'Password updated!');
+      if (data.success) {
+        document.getElementById('passOld').value = '';
+        document.getElementById('passNew').value = '';
+        document.getElementById('passConfirm').value = '';
+      }
+    } catch(err) { alert('Error updating password'); }
+  }
+
+  async function loadUserLogs() {
+    try {
+      const res = await fetch('/api/user/logs');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.logs && data.logs.length) {
+        document.getElementById('histActivityBody').innerHTML = data.logs.map(l => `
+          <tr>
+            <td>${new Date(l.timestamp).toLocaleString()}</td>
+            <td><strong>${l.action}</strong></td>
+            <td>${l.details || '-'}</td>
+            <td><code>${l.device_id || 'USER-001'}</code></td>
+          </tr>
+        `).join('');
+
+        // Populate recent events list on Dashboard
+        document.getElementById('recentEventsList').innerHTML = data.logs.slice(0, 4).map(l => `
+          <div style="display:flex; gap:12px; align-items:center;">
+            <span style="color:var(--text-sub); font-family:monospace;">${new Date(l.timestamp).toLocaleTimeString()}</span>
+            <span style="color:${l.action.includes('SPOOF')?'var(--red)':(l.action.includes('JAM')?'var(--yellow)':'var(--green)')}">
+              ${l.action.includes('SPOOF')?'🔴':(l.action.includes('JAM')?'🔴':'🟢')} ${l.action}: ${l.details}
+            </span>
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('histActivityBody').innerHTML = '<tr><td colspan="4" style="color:var(--text-sub)">No activity logs recorded.</td></tr>';
+      }
+    } catch(e) {}
+  }
+
+  async function loadUserAttacks() {
+    try {
+      const res = await fetch('/api/user/attacks');
+      if (!res.ok) return;
+      const data = await res.json();
+      allAttacks = data.attacks || [];
+      renderAttacksTable(allAttacks);
+    } catch(e) {}
+  }
+
+  async function pollUserDashboard() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      let queryDev = urlParams.get('device') || localStorage.getItem('geopulse_device_id') || localStorage.getItem('gps_user_device_id');
+      
+      const res = await fetch(`/api/user/status?device=${encodeURIComponent(queryDev || '')}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const sel = document.getElementById('userDeviceSelect');
+      if (data.available_devices && JSON.stringify(data.available_devices) !== JSON.stringify(knownDevices)) {
+        knownDevices = data.available_devices;
+        sel.innerHTML = knownDevices.length ? knownDevices.map(id=>`<option value="${id}">${id}</option>`).join('') : '<option>Waiting for device...</option>';
+        if (!selectedDevice || !knownDevices.includes(selectedDevice)) selectedDevice = data.device_id || knownDevices[0];
+        sel.value = selectedDevice;
+      }
+      sel.onchange = (e) => { selectedDevice = e.target.value; pollUserDashboard(); };
+
+      const devId = data.device_id || queryDev || 'USER-SESSION';
+      document.getElementById('dispUserName').textContent = data.user_name || '{{ session.get("name", "User") }}';
+      document.getElementById('profDevId').textContent = devId;
+
+      if (!data.active || !data.device) {
+        document.getElementById('cardSecStatus').textContent = 'STANDBY';
+        document.getElementById('cardSecStatus').style.color = 'var(--text-sub)';
+        document.getElementById('cardSecSub').textContent = 'Awaiting telemetry updates';
+        document.getElementById('headerStatusText').textContent = 'STANDBY';
+        document.getElementById('headerStatusBadge').className = 'status-badge badge-offline';
+
+        document.getElementById('mainSecBanner').className = 'prominent-status-banner banner-offline';
+        document.getElementById('bannerStatusTitle').textContent = '⚫ DEVICE OFFLINE';
+        document.getElementById('bannerStatusSub').textContent = 'We are not currently receiving telemetry from your device.';
+        return;
+      }
+
+      const dev = data.device;
+      const status = dev.status || 'NORMAL';
+
+      // Update Quick Cards
+      document.getElementById('cardCoords').textContent = `${dev.lat.toFixed(4)}, ${dev.lon.toFixed(4)}`;
+      document.getElementById('cardCoordsSub').textContent = `Accuracy: ${dev.accuracy ? dev.accuracy.toFixed(0) : 10} m • Updated ${dev.last_update_seconds_ago}s ago`;
+      document.getElementById('cardSignal').textContent = `${dev.satellites || 9} Satellites`;
+      document.getElementById('cardSignalSub').textContent = `C/N0: ${dev.cno || 42} dB-Hz • HDOP: ${dev.hdop || 0.9}`;
+      document.getElementById('cardSpeed').textContent = `${dev.speed ? dev.speed.toFixed(0) : 0} km/h`;
+      document.getElementById('cardMovementSub').textContent = `Heading: ${dev.heading ? dev.heading.toFixed(0) : 0}° • Altitude: ${dev.altitude ? dev.altitude.toFixed(0) : 35} m`;
+
+      // Update Location Telemetry Card (Dashboard)
+      const dLat = document.getElementById('dashLatVal');
+      if (dLat) dLat.textContent = `${dev.lat >= 0 ? dev.lat.toFixed(4) + '° N' : Math.abs(dev.lat).toFixed(4) + '° S'}`;
+      const dLon = document.getElementById('dashLonVal');
+      if (dLon) dLon.textContent = `${dev.lon >= 0 ? dev.lon.toFixed(4) + '° E' : Math.abs(dev.lon).toFixed(4) + '° W'}`;
+      const dAcc = document.getElementById('dashAccVal');
+      if (dAcc) dAcc.textContent = `${dev.accuracy ? dev.accuracy.toFixed(1) : 10.0} meters`;
+      const dAlt = document.getElementById('dashAltVal');
+      if (dAlt) dAlt.textContent = `${dev.altitude ? dev.altitude.toFixed(1) : 35.0} meters`;
+      const dSpeed = document.getElementById('dashSpeedVal');
+      if (dSpeed) dSpeed.textContent = `${dev.speed ? dev.speed.toFixed(0) : 0} km/h`;
+      const dHead = document.getElementById('dashHeadingVal');
+      if (dHead) dHead.textContent = `${dev.heading ? dev.heading.toFixed(0) : 0}°`;
+      const dSync = document.getElementById('dashSyncStatus');
+      if (dSync) {
+        dSync.textContent = status === 'NORMAL' ? '🟢 Telemetry Active' : '🔴 Alert Active';
+        dSync.style.color = status === 'NORMAL' ? 'var(--green)' : 'var(--red)';
+      }
+      const dLast = document.getElementById('dashLastUpdateSec');
+      if (dLast) dLast.textContent = `${dev.last_update_seconds_ago}s ago`;
+
+      // Update Location Page Values
+      document.getElementById('locFullCoords').textContent = `${dev.lat.toFixed(4)}°, ${dev.lon.toFixed(4)}°`;
+      document.getElementById('locFullTime').textContent = `Updated ${dev.last_update_seconds_ago}s ago`;
+      document.getElementById('locFullAccuracy').textContent = `${dev.accuracy ? dev.accuracy.toFixed(1) : 10.0} meters`;
+      document.getElementById('locFullSpeed').textContent = `${dev.speed ? dev.speed.toFixed(0) : 0} km/h (${dev.heading ? dev.heading.toFixed(0) : 0}°)`;
+      document.getElementById('locFullAlt').textContent = `Altitude: ${dev.altitude ? dev.altitude.toFixed(0) : 35} m`;
+
+      // Update Prominent Security Banners & Indicators
+      const secCard = document.getElementById('cardSecStatus');
+      const headerBadge = document.getElementById('headerStatusBadge');
+      const headerText = document.getElementById('headerStatusText');
+      const mainBanner = document.getElementById('mainSecBanner');
+      const bannerTitle = document.getElementById('bannerStatusTitle');
+      const bannerSub = document.getElementById('bannerStatusSub');
+
+      const secDiagBanner = document.getElementById('secDiagBanner');
+      const secDiagTitle = document.getElementById('secDiagTitle');
+      const secDiagSub = document.getElementById('secDiagSub');
+
+      if (status === 'SPOOFING' || status === 'SPOOFING DETECTED') {
+        secCard.textContent = 'SPOOFING DETECTED';
+        secCard.style.color = 'var(--red)';
+        headerBadge.className = 'status-badge badge-spoof';
+        headerText.textContent = 'SPOOFING DETECTED';
+
+        mainBanner.className = 'prominent-status-banner banner-spoof';
+        bannerTitle.textContent = '🔴 GPS SPOOFING DETECTED';
+        bannerSub.textContent = 'Unusual GPS movement has been detected on your device.';
+
+        secDiagBanner.className = 'prominent-status-banner banner-spoof';
+        secDiagTitle.textContent = '🔴 GPS SPOOFING DETECTED';
+        secDiagSub.textContent = 'Position jump anomaly flagged. Synthetic coordinates detected.';
+
+        document.getElementById('compactSecChecklist').innerHTML = `
+          <div class="check-item"><span style="color:var(--red)">⚠</span> <span>GPS spoofing detected</span></div>
+        `;
+      } else if (status === 'JAMMING' || status === 'JAMMING DETECTED') {
+        secCard.textContent = 'JAMMING DETECTED';
+        secCard.style.color = 'var(--yellow)';
+        headerBadge.className = 'status-badge badge-jam';
+        headerText.textContent = 'JAMMING DETECTED';
+
+        mainBanner.className = 'prominent-status-banner banner-jam';
+        bannerTitle.textContent = '🔴 GPS JAMMING DETECTED';
+        bannerSub.textContent = 'Your GPS signal appears to be interrupted.';
+
+        secDiagBanner.className = 'prominent-status-banner banner-jam';
+        secDiagTitle.textContent = '🔴 GPS JAMMING DETECTED';
+        secDiagSub.textContent = 'RF signal loss detected. Satellite lock interrupted.';
+
+        document.getElementById('compactSecChecklist').innerHTML = `
+          <div class="check-item"><span style="color:var(--yellow)">⚠</span> <span>GPS signal interruption detected</span></div>
+        `;
+      } else {
+        secCard.textContent = 'NORMAL';
+        secCard.style.color = 'var(--green)';
+        headerBadge.className = 'status-badge badge-normal';
+        headerText.textContent = 'ONLINE';
+
+        mainBanner.className = 'prominent-status-banner banner-normal';
+        bannerTitle.textContent = '🟢 GPS SECURE';
+        bannerSub.textContent = 'Your GPS is operating normally.';
+
+        secDiagBanner.className = 'prominent-status-banner banner-normal';
+        secDiagTitle.textContent = '🟢 GPS SECURE';
+        secDiagSub.textContent = 'Your GPS system is operating normally without malicious interference.';
+
+        document.getElementById('compactSecChecklist').innerHTML = `
+          <div class="check-item"><span style="color:var(--green)">✓</span> <span>GPS satellite lock</span></div>
+          <div class="check-item"><span style="color:var(--green)">✓</span> <span>GPS signal normal</span></div>
+          <div class="check-item"><span style="color:var(--green)">✓</span> <span>No location spoofing detected</span></div>
+          <div class="check-item"><span style="color:var(--green)">✓</span> <span>No signal jamming</span></div>
+          <div class="check-item"><span style="color:var(--green)">✓</span> <span>Telemetry connected</span></div>
+        `;
+      }
+
+      // Leaflet Maps Positions
+      const latlng = [dev.lat, dev.lon];
+      updateReverseGeocode(dev.lat, dev.lon);
+      const customIcon = L.divIcon({ className: 'google-location-puck', iconSize: [22, 22], iconAnchor: [11, 11] });
+
+      if (overviewMap) {
+        if (!ovMarker) {
+          ovMarker = L.marker(latlng, { icon: customIcon }).addTo(overviewMap);
+          ovCircle = L.circle(latlng, { radius: dev.accuracy || 15, color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.18, weight: 1.5 }).addTo(overviewMap);
+          overviewMap.setView(latlng, 16);
+        } else {
+          ovMarker.setLatLng(latlng);
+          ovCircle.setLatLng(latlng);
+          ovCircle.setRadius(dev.accuracy || 15);
+          if (autoFollowUser) overviewMap.panTo(latlng);
+        }
+      }
+
+      if (fullLocationMap) {
+        if (!locMarker) {
+          locMarker = L.marker(latlng, { icon: customIcon }).addTo(fullLocationMap);
+          locCircle = L.circle(latlng, { radius: dev.accuracy || 15, color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.18, weight: 1.5 }).addTo(fullLocationMap);
+          fullLocationMap.setView(latlng, 16);
+        } else {
+          locMarker.setLatLng(latlng);
+          locCircle.setLatLng(latlng);
+          locCircle.setRadius(dev.accuracy || 15);
+          if (autoFollowUser) fullLocationMap.panTo(latlng);
+        }
+      }
+
+      // Trajectory History Polyline
+      if (dev.history && dev.history.length > 1) {
+        const pathCoords = dev.history.map(h => [h.lat, h.lon]);
+        if (overviewMap) {
+          if (!ovPoly) ovPoly = L.polyline(pathCoords, { color: '#00f0ff', weight: 3, opacity: 0.7, dashArray: '5, 8' }).addTo(overviewMap);
+          else ovPoly.setLatLngs(pathCoords);
+        }
+        if (fullLocationMap) {
+          if (!locPoly) locPoly = L.polyline(pathCoords, { color: '#00f0ff', weight: 3, opacity: 0.7, dashArray: '5, 8' }).addTo(fullLocationMap);
+          else locPoly.setLatLngs(pathCoords);
+        }
+      }
+
+      // Populate Alerts Log
+      if (data.alerts && data.alerts.length) {
+        document.getElementById('alertsHistoryBody').innerHTML = data.alerts.map(a => `
+          <tr>
+            <td><span style="color:${a.severity==='CRITICAL'?'var(--red)':'var(--yellow)'}">${a.severity}</span></td>
+            <td>${a.user_message || a.message}</td>
+            <td>${new Date(a.timestamp).toLocaleTimeString()}</td>
+            <td><strong>${a.type}</strong></td>
+          </tr>
+        `).join('');
+
+        // Populate Active Alerts if threat is active
+        if (status.includes('SPOOF') || status.includes('JAM')) {
+          document.getElementById('activeAlertsContainer').innerHTML = `
+            <div style="background:rgba(255,51,102,0.15); border:1px solid var(--red); padding:16px; border-radius:10px; color:var(--red); font-size:14px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong>🔴 ${status}</strong>
+                <p style="font-size:12px; margin-top:2px;">Your device is reporting unusual GPS movement or signal loss.</p>
+              </div>
+              <button class="btn-action" onclick="switchTab('tab-security', 'nav-security', '/user/security')">View Details</button>
+            </div>
+          `;
+        } else {
+          document.getElementById('activeAlertsContainer').innerHTML = `
+            <div style="background:#0f141d; padding:16px; border-radius:10px; border:1px solid var(--card-border); color:var(--green); font-size:13px; font-weight:600;">
+              ✓ No active security alerts
+            </div>
+          `;
+        }
+      }
+
+      // Populate Location History Sub-tab
+      if (dev.history && dev.history.length) {
+        document.getElementById('histLocationsBody').innerHTML = dev.history.slice(-10).reverse().map(h => `
+          <tr>
+            <td>${new Date(h.ts * 1000).toLocaleTimeString()}</td>
+            <td>${h.lat.toFixed(4)}°</td>
+            <td>${h.lon.toFixed(4)}°</td>
+            <td>${(h.speed || 0).toFixed(0)} km/h</td>
+            <td><span style="color:var(--green)">${h.status || 'NORMAL'}</span></td>
+          </tr>
+        `).join('');
+      }
+
+    } catch (e) {}
+  }
+
+  loadUserLogs();
+  loadUserAttacks();
+  setInterval(pollUserDashboard, 2000);
+  pollUserDashboard();
+</script>
+
+</body>
+</html>

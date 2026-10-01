@@ -10,13 +10,23 @@ import requests
 from collections import deque
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from functools import wraps
+from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect, url_for
 
 # Import modular components
 import config
 from detector import SingleDeviceDetector
+import db
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "gps-securetrack-secret-key-2026")
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # State registries
 devices = {}            # device_id -> current state dictionary
@@ -30,8 +40,10 @@ attack_timeline = []    # Attack History Timeline records
 device_registry = {}    # persistent mapping: device_id -> last_known_ip
 live_metrics = {"tp": 0, "tn": 0, "fp": 0, "fn": 0}  # session classification stats
 operator_location = {"lat": None, "lon": None, "city": None} # stores host operator's coordinates shared by dashboard
-
 ip_geo_cache = {}
+ATTACKER_API_KEY = os.environ.get("ATTACKER_API_KEY", "default-test-key")
+attack_overrides = {}   # target_device_id -> override payload dict
+SERVER_START = time.time()
 
 def is_private_ip(ip):
     """True for localhost / same-Wi-Fi private addresses -- these have
@@ -47,11 +59,7 @@ def is_private_ip(ip):
         return True
     return (a == 10) or (a == 127) or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31)
 
-
 def geolocate_ip(ip):
-    """Real IP -> approximate city-level lat/lon via the free ip-api.com
-    endpoint (no API key required). Cached per-IP so this runs at most
-    once per unique attacker IP, not on every dashboard poll (every 2s)."""
     if ip in ip_geo_cache:
         return ip_geo_cache[ip]
     if is_private_ip(ip):
@@ -74,11 +82,6 @@ def geolocate_ip(ip):
         pass
     ip_geo_cache[ip] = None
     return None
-
-SERVER_START = time.time()
-
-# Ensure directories exist
-os.makedirs("data", exist_ok=True)
 
 def log_row(path, fieldnames, row):
     file_exists = os.path.isfile(path)
@@ -115,17 +118,126 @@ def raise_alert(device_id, alert_type, severity, message):
     print(f"[ALERT] {alert_type} | {device_id} | {message}")
     return alert
 
+# Initialize database schema & seed default accounts
+db.init_db()
+
+# Role-Based Access Control (RBAC) Decorators
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Unauthorized', 'redirect': '/login'}), 401
+            return redirect(url_for('login_view'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(role):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_id' not in session:
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Unauthorized', 'redirect': '/login'}), 401
+                return redirect(url_for('login_view'))
+            if session.get('role') != role and session.get('role') != 'HOST':
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Forbidden: HOST role required'}), 403
+                return redirect(url_for('user_portal'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Authentication & Access Routes
+@app.route("/login", methods=["GET", "POST"])
+def login_view():
+    if request.method == "POST":
+        identifier = request.form.get("identifier", "").strip()
+        password = request.form.get("password", "").strip()
+        user, error = db.verify_user_credentials(identifier, password)
+        if error or not user:
+            return render_template("login.html", error=error or "Invalid login credentials", identifier=identifier)
+        
+        session["user_id"] = user["user_id"]
+        session["username"] = user["username"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        session["role"] = user["role"]
+        session["device_id"] = user.get("device_id") or f"USER-{user['id']}"
+
+        db.log_activity(user["user_id"], session["device_id"], "LOGIN", "Successful login", request.remote_addr)
+
+        if user["role"] == "HOST":
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("user_portal"))
+
+    if "user_id" in session:
+        if session.get("role") == "HOST":
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("user_portal"))
+    return render_template("login.html")
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup_view():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
+        confirm = request.form.get("confirm_password", "").strip()
+        device_id = request.form.get("device_id", "").strip() or None
+
+        if not name or not username or not email or not password:
+            return render_template("signup.html", error="All required fields must be filled.", name=name, username=username, email=email, device_id=device_id)
+        if password != confirm:
+            return render_template("signup.html", error="Passwords do not match.", name=name, username=username, email=email, device_id=device_id)
+
+        success, res = db.create_user(name, username, email, password, role="USER", device_id=device_id)
+        if not success:
+            return render_template("signup.html", error=res, name=name, username=username, email=email, device_id=device_id)
+
+        user = res
+        session["user_id"] = user["user_id"]
+        session["username"] = user["username"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        session["role"] = user["role"]
+        session["device_id"] = user.get("device_id") or f"USER-{user['id']}"
+
+        db.log_activity(user["user_id"], session["device_id"], "SIGNUP", "Created new account", request.remote_addr)
+        return redirect(url_for("user_portal"))
+
+    return render_template("signup.html")
+
+@app.route("/logout")
+def logout_view():
+    if "user_id" in session:
+        db.log_activity(session["user_id"], session.get("device_id"), "LOGOUT", "User logged out", request.remote_addr)
+    session.clear()
+    return redirect(url_for("login_view"))
+
 @app.route("/")
 def home():
-    return render_template("dashboard.html")
+    if "user_id" in session:
+        if session.get("role") == "HOST":
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("user_portal"))
+    return redirect(url_for("login_view"))
 
 @app.route("/dashboard")
+@role_required("HOST")
 def dashboard():
     return render_template("dashboard.html")
 
+@app.route("/user")
+@app.route("/user/<path:subpath>")
+@login_required
+def user_portal(subpath=None):
+    return render_template("user.html")
+
 @app.route("/collector")
 def collector():
-    return render_template("collector.html")
+    return render_template("collector.html", user_device=session.get("device_id"))
 
 @app.route("/update", methods=["POST"])
 def update_telemetry():
@@ -141,6 +253,41 @@ def update_telemetry():
     device_registry[device_id] = request_ip
     attack_state = payload.get("attack_state", "NORMAL")
     attacker_ip = payload.get("attacker_ip")
+    source = payload.get("source", "browser" if str(device_id).startswith("USER-") else "gps_client")
+
+    # Handle explicit user disconnection without false jamming alarms
+    if payload.get("action") == "disconnect" or payload.get("status") == "OFFLINE":
+        if device_id in devices:
+            devices[device_id]["status"] = "OFFLINE"
+            devices[device_id]["explicit_offline"] = True
+        return jsonify({"status": "OFFLINE", "received": True})
+
+    # Check for authorized synthetic test attack overrides
+    if device_id in attack_overrides:
+        override = attack_overrides[device_id]
+        cmd = override.get("cmd", "NORMAL").upper()
+        if cmd == "SPOOF":
+            attack_state = "SPOOF"
+            attacker_ip = override.get("attacker_ip", request_ip)
+            if "lat" in override and override["lat"] is not None:
+                payload["lat"] = override["lat"]
+            else:
+                curr_lat = float(payload.get("latitude") or payload.get("lat") or 0.0)
+                payload["lat"] = curr_lat + 0.05
+            if "lon" in override and override["lon"] is not None:
+                payload["lon"] = override["lon"]
+            else:
+                curr_lon = float(payload.get("longitude") or payload.get("lon") or 0.0)
+                payload["lon"] = curr_lon + 0.05
+            if "speed" in override and override["speed"] is not None:
+                payload["speed"] = override["speed"]
+            else:
+                payload["speed"] = 180.0
+        elif cmd == "JAM":
+            attack_state = "JAM"
+            attacker_ip = override.get("attacker_ip", request_ip)
+        elif cmd == "NORMAL":
+            attack_state = "NORMAL"
 
     # Mitigation Filter: Automatically unblock if recovery command is active
     if device_id in blocked_devices or request_ip in blocked_ips:
@@ -155,11 +302,11 @@ def update_telemetry():
         else:
             return jsonify({"status": "BLOCKED", "messages": ["Source blacklisted by firewall"]}), 403
 
-    lat = float(payload.get("lat", 0.0))
-    lon = float(payload.get("lon", 0.0))
-    altitude = float(payload.get("altitude", 0.0))
-    speed = float(payload.get("speed", 0.0))
-    heading = float(payload.get("heading", 0.0))
+    lat = float(payload.get("latitude") if "latitude" in payload else payload.get("lat", 0.0))
+    lon = float(payload.get("longitude") if "longitude" in payload else payload.get("lon", 0.0))
+    altitude = float(payload.get("altitude") if payload.get("altitude") is not None else 0.0)
+    speed = float(payload.get("speed_kmh") if "speed_kmh" in payload else payload.get("speed", 0.0))
+    heading = float(payload.get("heading") if payload.get("heading") is not None else 0.0)
     accuracy = float(payload.get("accuracy", 0.0))
     client_ts = float(payload.get("timestamp", time.time()))
     
@@ -174,6 +321,7 @@ def update_telemetry():
         lat, lon, altitude, speed, heading, accuracy, client_ts, attack_state, attacker_ip, now
     )
     state["ip"] = request_ip
+    state["source"] = source
     
     devices[device_id] = state
     sky_state[device_id] = detectors[device_id].sky_state
@@ -278,20 +426,20 @@ def api_status():
         status = d["status"]
         
         # Jamming timeout / Offline transition
-        if silent_for > 45.0:
+        if d.get("explicit_offline") or silent_for > 45.0:
             status = "OFFLINE"
         elif silent_for > config.JAMMING_TIMEOUT_SECONDS:
             if device_id in blocked_devices:
                 status = "BLOCKED"
-            else:
+            elif d.get("attack_state") == "JAM" or d.get("status") == "JAMMING":
                 status = "JAMMING"
-            
-            if status == "JAMMING":
                 if not (alert_history and alert_history[0]["device_id"] == device_id
                         and alert_history[0]["type"] == "JAMMING"
                         and silent_for < config.JAMMING_TIMEOUT_SECONDS + 3.0):
                     raise_alert(device_id, "JAMMING", "CRITICAL",
-                                f"Signal Loss: Device silent for {silent_for:.0f}s (jamming timeout threshold)")
+                                f"Signal Loss: Device silent for {silent_for:.0f}s under active jamming attack")
+            else:
+                status = "STANDBY"
 
         out[device_id] = {
             "lat": d["lat"], "lon": d["lon"], "altitude": d.get("altitude"),
@@ -378,8 +526,8 @@ def api_status():
 
     return jsonify({
         "devices": out,
-        "alerts": alert_history[:25],
-        "attack_timeline": attack_timeline[-10:],  # Return last 10 timeline entries
+        "alerts": alert_history[:50],
+        "attack_timeline": attack_timeline[-50:],  # Return up to 50 historical timeline entries
         "blocked_devices": list(blocked_devices),
         "blocked_ips": list(blocked_ips),
         "attacker_location": attacker_loc,
@@ -404,6 +552,219 @@ def api_status():
             "jamming_timeout_s": config.JAMMING_TIMEOUT_SECONDS,
         }
     })
+
+@app.route("/api/logs/download/<log_type>", methods=["GET"])
+def download_log_file(log_type):
+    """Allows downloading recorded CSV logs for all user devices and attacks."""
+    file_map = {
+        "attacks": config.ATTACK_HISTORY_FILE,
+        "alerts": config.ALERT_LOG_FILE,
+        "telemetry": config.DATA_LOG_FILE
+    }
+    target_file = file_map.get(log_type)
+    if target_file and os.path.exists(target_file):
+        directory = os.path.dirname(os.path.abspath(target_file))
+        filename = os.path.basename(target_file)
+        return send_from_directory(directory, filename, as_attachment=True)
+    return jsonify({"error": "Log file not found"}), 404
+
+user_privacy_settings = {}  # device_id -> {"monitoring": True, "sharing": True}
+
+@app.route("/api/user/privacy", methods=["POST"])
+@login_required
+def api_user_privacy():
+    payload = request.get_json(force=True, silent=True) or {}
+    device_id = payload.get("device_id") or session.get("device_id")
+    if device_id:
+        user_privacy_settings[device_id] = {
+            "monitoring": payload.get("monitoring", True),
+            "sharing": payload.get("sharing", True)
+        }
+        db.log_activity(session.get("user_id"), device_id, "PRIVACY_TOGGLE", f"Updated monitoring={payload.get('monitoring')}, sharing={payload.get('sharing')}", request.remote_addr)
+    return jsonify({"success": True})
+
+@app.route("/api/user/status", methods=["GET"])
+@login_required
+def api_user_status():
+    """Filtered user portal API: returns personal location, personal GPS status, and user-friendly alerts with strict data isolation."""
+    now = time.time()
+    query_dev = request.args.get("device")
+    user_id = session.get("user_id")
+    user_role = session.get("role", "USER")
+    user_dev = session.get("device_id")
+
+    # Fetch user's registered devices from DB
+    registered_devices = db.get_user_devices(user_id) if user_id else []
+    user_device_ids = [d["device_id"] for d in registered_devices if d.get("device_id") != "SOC-HOST"]
+    if user_dev and user_dev != "SOC-HOST" and user_dev not in user_device_ids:
+        user_device_ids.append(user_dev)
+
+    # Active victim / user devices in memory (excluding SOC-HOST)
+    active_user_devices = [d for d in devices.keys() if d != "SOC-HOST"]
+
+    # Data Isolation: USER role can ONLY inspect their own devices
+    if user_role != "HOST":
+        if query_dev and query_dev in user_device_ids:
+            target_id = query_dev
+        elif user_dev and user_dev != "SOC-HOST" and user_dev in devices:
+            target_id = user_dev
+        elif user_device_ids:
+            target_id = user_device_ids[0]
+        elif active_user_devices:
+            target_id = active_user_devices[0]
+        else:
+            target_id = user_dev if (user_dev and user_dev != "SOC-HOST") else "USER-001"
+    else:
+        # HOST role inspecting User Portal
+        if query_dev and query_dev in devices and query_dev != "SOC-HOST":
+            target_id = query_dev
+        elif active_user_devices:
+            target_id = active_user_devices[0]
+        elif user_device_ids:
+            target_id = user_device_ids[0]
+        else:
+            target_id = "USER-001"
+
+    available = user_device_ids if user_role != "HOST" else (active_user_devices or ["USER-001"])
+
+    if not target_id or target_id not in devices:
+        return jsonify({
+            "active": False,
+            "device_id": target_id if target_id != "SOC-HOST" else "USER-001",
+            "available_devices": available,
+            "user_name": session.get("name", "User"),
+            "message": "No active telemetry found for your session."
+        })
+
+    dev = devices[target_id]
+    silent_for = now - dev["ts"]
+    
+    # Derive user-safe status
+    status = dev["status"]
+    if dev.get("explicit_offline") or silent_for > 45.0:
+        status = "OFFLINE"
+    elif silent_for > config.JAMMING_TIMEOUT_SECONDS:
+        if dev.get("attack_state") == "JAM" or status in ("JAMMING", "JAMMING DETECTED"):
+            status = "JAMMING DETECTED"
+        else:
+            status = "STANDBY"
+    elif status == "SPOOFING":
+        status = "SPOOFING DETECTED"
+    elif status == "JAMMING":
+        status = "JAMMING DETECTED"
+
+    # Filter user alerts and translate technical alerts to human explanations
+    user_alerts = []
+    for a in alert_history:
+        if a.get("device_id") == target_id:
+            raw_msg = a.get("message", "")
+            user_msg = raw_msg
+            if "GPS Jump Alert" in raw_msg or "Impossible Speed Alert" in raw_msg or "Trajectory Deviation" in raw_msg:
+                user_msg = "Suspicious GPS movement detected. The reported location changed faster than physically expected."
+            elif "Signal Loss" in raw_msg or "JAMMING" in a.get("type", ""):
+                user_msg = "GPS signal interruption detected. Satellite lock dropped or signal lost."
+            elif "Threat neutralized" in raw_msg or "Unblocked" in raw_msg:
+                user_msg = "GPS service and security status restored to normal."
+            
+            user_alerts.append({
+                "severity": a.get("severity", "WARNING"),
+                "message": raw_msg,
+                "user_message": user_msg,
+                "timestamp": a.get("timestamp"),
+                "type": a.get("type")
+            })
+
+    # Prepare clean user device state
+    user_device_state = {
+        "lat": dev["lat"],
+        "lon": dev["lon"],
+        "altitude": dev.get("altitude", 35.0),
+        "speed": dev.get("speed", 0.0),
+        "heading": dev.get("heading", 0.0),
+        "accuracy": dev.get("accuracy", 10.0),
+        "ts": dev["ts"],
+        "status": status,
+        "satellites": dev.get("satellites", 9),
+        "cno": dev.get("cno", 42.0),
+        "hdop": dev.get("hdop", 0.9),
+        "last_update_seconds_ago": round(silent_for, 1),
+        "source": dev.get("source", "browser"),
+        "history": list(history.get(target_id, []))
+    }
+
+    return jsonify({
+        "active": True,
+        "device_id": target_id,
+        "device": user_device_state,
+        "alerts": user_alerts[:15],
+        "available_devices": available,
+        "privacy": user_privacy_settings.get(target_id, {"monitoring": True, "sharing": True})
+    })
+
+@app.route("/api/user/attacks", methods=["GET"])
+@login_required
+def api_user_attacks():
+    """Returns attack history timeline records filtered strictly for the authenticated user's device."""
+    user_dev = session.get("device_id")
+    user_role = session.get("role", "USER")
+
+    filtered_attacks = []
+    for entry in attack_timeline:
+        if user_role == "HOST" or entry.get("victim_device") == user_dev:
+            filtered_attacks.append(entry)
+
+    return jsonify({"attacks": filtered_attacks[-20:]})
+
+@app.route("/api/user/logs", methods=["GET"])
+@login_required
+def api_user_logs():
+    """Returns user activity & audit logs from SQLite database."""
+    user_id = session.get("user_id")
+    logs = db.get_user_activity_logs(user_id) if user_id else []
+    return jsonify({"logs": logs})
+
+@app.route("/api/user/profile", methods=["GET", "POST"])
+@login_required
+def api_user_profile():
+    user_id = session.get("user_id")
+    if request.method == "POST":
+        payload = request.get_json(force=True, silent=True) or {}
+        
+        # Password update
+        if "old_password" in payload and "new_password" in payload:
+            success, msg = db.update_user_password(user_id, payload["old_password"], payload["new_password"])
+            if success:
+                db.log_activity(user_id, session.get("device_id"), "PASSWORD_CHANGE", "Updated account password", request.remote_addr)
+            return jsonify({"success": success, "message": msg})
+
+        # Avatar update
+        if "avatar_url" in payload:
+            success, msg = db.update_user_avatar(user_id, payload["avatar_url"])
+            if success:
+                session["avatar_url"] = payload["avatar_url"]
+                db.log_activity(user_id, session.get("device_id"), "AVATAR_UPDATE", "Updated profile picture", request.remote_addr)
+            return jsonify({"success": success, "message": msg})
+
+        # Profile update
+        name = payload.get("name", "").strip()
+        email = payload.get("email", "").strip()
+        device_id = payload.get("device_id", "").strip()
+
+        if not name or not email:
+            return jsonify({"success": False, "message": "Name and email are required."}), 400
+
+        success, msg = db.update_user_profile(user_id, name, email, device_id)
+        if success:
+            session["name"] = name
+            session["email"] = email
+            if device_id:
+                session["device_id"] = device_id
+            db.log_activity(user_id, session.get("device_id"), "PROFILE_UPDATE", "Updated profile details", request.remote_addr)
+
+        return jsonify({"success": success, "message": msg})
+
+    user = db.get_user_by_id(user_id)
+    return jsonify({"user": user})
 
 @app.route("/api/settings", methods=["GET", "POST"])
 def api_settings():
@@ -516,6 +877,80 @@ def api_devices_unblock():
         
     raise_alert(device_id, "MITIGATION", "INFO", f"Mitigation removed: Unblocked source {device_id}")
     return jsonify({"success": True})
+
+def check_attacker_auth(req):
+    key = req.headers.get("X-API-Key") or req.args.get("key")
+    if not key:
+        payload = req.get_json(force=True, silent=True) or {}
+        key = payload.get("api_key")
+    return (key == ATTACKER_API_KEY)
+
+@app.route("/api/attacker/sessions", methods=["GET"])
+def api_attacker_sessions():
+    if not check_attacker_auth(request):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    active_sessions = []
+    now = time.time()
+    for dev_id, dev in devices.items():
+        if now - dev.get("ts", 0) < 600:
+            active_sessions.append({
+                "device_id": dev_id,
+                "status": dev.get("status", "NORMAL"),
+                "lat": dev.get("lat"),
+                "lon": dev.get("lon"),
+                "source": dev.get("source", "unknown"),
+                "last_update": round(now - dev.get("ts", 0), 1)
+            })
+    return jsonify({"sessions": active_sessions, "count": len(active_sessions)})
+
+@app.route("/attack", methods=["POST"])
+@app.route("/api/attacker/command", methods=["POST"])
+def api_attacker_command():
+    payload = request.get_json(force=True, silent=True) or {}
+    
+    # Verify attacker authorization key
+    auth_ok = check_attacker_auth(request) or (request.remote_addr in ("127.0.0.1", "::1"))
+    if not auth_ok and os.environ.get("REQUIRE_ATTACKER_KEY") == "true":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    target_id = payload.get("device_id") or payload.get("target_device_id") or "device_B"
+    cmd = str(payload.get("cmd", "normal")).upper()
+    
+    attacker_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+
+    if cmd == "NORMAL":
+        if target_id in attack_overrides:
+            del attack_overrides[target_id]
+        victim_ip = device_registry.get(target_id)
+        if victim_ip:
+            def send_recovery():
+                try:
+                    requests.post(f"http://{victim_ip}:9999/attack", json={"cmd": "normal"}, timeout=2)
+                except Exception:
+                    pass
+            threading.Thread(target=send_recovery, daemon=True).start()
+    else:
+        attack_overrides[target_id] = {
+            "cmd": cmd,
+            "lat": payload.get("lat"),
+            "lon": payload.get("lon"),
+            "altitude": payload.get("altitude"),
+            "speed": payload.get("speed"),
+            "heading": payload.get("heading"),
+            "accuracy": payload.get("accuracy"),
+            "attacker_ip": attacker_ip
+        }
+        victim_ip = device_registry.get(target_id)
+        if victim_ip:
+            def forward_attack():
+                try:
+                    requests.post(f"http://{victim_ip}:9999/attack", json=payload, timeout=2)
+                except Exception:
+                    pass
+            threading.Thread(target=forward_attack, daemon=True).start()
+
+    return jsonify({"success": True, "target_device_id": target_id, "mode": cmd})
 
 @app.route("/api/operator/location", methods=["GET", "POST"])
 def api_operator_location():

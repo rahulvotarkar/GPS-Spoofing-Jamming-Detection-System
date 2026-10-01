@@ -245,7 +245,7 @@
   <main>
     <div class="topbar">
       <div class="title-wrap">
-        <!-- Dashboard name removed from here to clean up headers as requested -->
+        <h2 style="margin:0; font-size:18px; color:var(--text-hi); font-family:'Orbitron'; font-weight:700;">🖥️ SOC SECURITY OPERATIONS CENTER <span style="font-size:11px; color:var(--cyan); font-family:'Rubik'; border:1px solid var(--cyan); padding:2px 8px; border-radius:12px; margin-left:8px;">HOST MONITORING MODE</span></h2>
       </div>
       <div class="badges">
         <button id="muteAlarmBtn" onclick="toggleMute()" style="display:none; background:var(--red); color:#fff; border:none; padding:8px 12px; border-radius:9px; font-size:12px; cursor:pointer; font-weight:bold; font-family:'Orbitron'; box-shadow:0 0 10px rgba(255, 77, 94, 0.4); margin-right:6px;">MUTE ALARM</button>
@@ -495,10 +495,21 @@
 
       <!-- ================= TAB: LOGS & REPORTS ================= -->
       <div id="tab-logs" class="tab-content" style="display:none;">
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head">
+            <h3>USER RECORDED DATA & EXPORT LOGS</h3>
+            <div style="display:flex; gap:8px;">
+              <a href="/api/logs/download/attacks" download style="background:#132038; color:var(--cyan); border:1px solid #1d3a55; padding:6px 12px; border-radius:6px; font-size:11.5px; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:4px;">⬇ Download User Attack History CSV</a>
+              <a href="/api/logs/download/alerts" download style="background:#132038; color:var(--orange); border:1px solid #1d3a55; padding:6px 12px; border-radius:6px; font-size:11.5px; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:4px;">⬇ Download Security Alerts CSV</a>
+              <a href="/api/logs/download/telemetry" download style="background:#132038; color:var(--green); border:1px solid #1d3a55; padding:6px 12px; border-radius:6px; font-size:11.5px; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:4px;">⬇ Download Telemetry Dataset CSV</a>
+            </div>
+          </div>
+        </div>
+
         <div class="grid-2" style="grid-template-columns: 1fr 1fr;">
           <div class="panel" style="max-height: 400px; overflow-y: auto;">
             <div class="panel-head">
-              <h3>GPS UPDATE LOGS (data/gps_log.csv)</h3>
+              <h3>RECORDED USER TELEMETRY LOGS (data/labeled_dataset.csv)</h3>
               <button onclick="refreshGpsLogs()" style="background:#1c2436; color:var(--cyan); border:1px solid #1d3a55; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer;">Refresh</button>
             </div>
             <div style="overflow-x:auto;">

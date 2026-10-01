@@ -218,3 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 Data/train.csv
+Data/*.db
+Data/gps_securetrack.db
+

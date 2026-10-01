@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GPS SecureTrack | Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg-dark: #0b0e14;
+    --card-bg: #141923;
+    --card-border: #222d3d;
+    --cyan: #00f0ff;
+    --green: #00ff88;
+    --red: #ff3366;
+    --yellow: #f59e0b;
+    --text-main: #e2e8f0;
+    --text-sub: #94a3b8;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(0, 255, 136, 0.05) 0%, transparent 40%);
+  }
+
+  .auth-container {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 36px 30px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  }
+
+  .auth-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .auth-logo {
+    width: 52px;
+    height: 52px;
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid var(--cyan);
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin-bottom: 12px;
+  }
+
+  .auth-header h1 {
+    font-size: 22px;
+    color: var(--cyan);
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+
+  .auth-header p {
+    font-size: 13px;
+    color: var(--text-sub);
+    margin-top: 4px;
+  }
+
+  .alert-box {
+    background: rgba(255, 51, 102, 0.15);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 12px 14px;
+    background: #0f141d;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus {
+    border-color: var(--cyan);
+  }
+
+  .form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 24px;
+    color: var(--text-sub);
+  }
+
+  .form-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .form-options a {
+    color: var(--cyan);
+    text-decoration: none;
+  }
+
+  .btn-submit {
+    width: 100%;
+    padding: 12px;
+    background: var(--cyan);
+    color: #0b0e14;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .btn-submit:hover {
+    opacity: 0.9;
+  }
+
+  .auth-footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--text-sub);
+  }
+
+  .auth-footer a {
+    color: var(--cyan);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .demo-creds {
+    margin-top: 20px;
+    padding: 12px;
+    background: #0f141d;
+    border: 1px dashed var(--card-border);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-sub);
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-container">
+  <div class="auth-header">
+    <div class="auth-logo">🛡️</div>
+    <h1>GPS SecureTrack</h1>
+    <p>Sign in to your account</p>
+  </div>
+
+  {% if error %}
+    <div class="alert-box">{{ error }}</div>
+  {% endif %}
+
+  <form action="/login" method="POST">
+    <div class="form-group">
+      <label for="identifier">Email or Username</label>
+      <input type="text" id="identifier" name="identifier" class="form-input" placeholder="user@gpssecuretrack.com" required value="{{ identifier or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
+    </div>
+
+    <div class="form-options">
+      <label><input type="checkbox" name="remember"> Remember me</label>
+      <a href="#" onclick="alert('Demo Mode: Contact your SOC Administrator to reset password.')">Forgot password?</a>
+    </div>
+
+    <button type="submit" class="btn-submit">Log In</button>
+  </form>
+
+  <div class="auth-footer">
+    Don't have an account? <a href="/signup">Create Account</a>
+  </div>
+</div>
+
+</body>
+</html>
