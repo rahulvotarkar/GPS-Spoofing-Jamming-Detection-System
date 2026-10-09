@@ -1309,6 +1309,16 @@
         requestBrowserGPS();
       }
     }, 500);
+
+    // Auto-resume streaming when mobile screen unlocks or tab becomes active
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (typeof pollUserDashboard === 'function') pollUserDashboard();
+        if (typeof requestBrowserGPS === 'function' && liveGpsWatchId === null && vmSimInterval === null) {
+          requestBrowserGPS();
+        }
+      }
+    });
   });
 
   let mapTileLayers = { ov: {}, loc: {} };

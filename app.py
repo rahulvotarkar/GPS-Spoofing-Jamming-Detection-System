@@ -426,7 +426,7 @@ def api_status():
         status = d["status"]
         
         # Jamming timeout / Offline transition
-        if d.get("explicit_offline") or silent_for > 45.0:
+        if d.get("explicit_offline") or silent_for > 120.0:
             status = "OFFLINE"
         elif silent_for > config.JAMMING_TIMEOUT_SECONDS:
             if device_id in blocked_devices:
@@ -651,7 +651,7 @@ def api_user_status():
     
     # Derive user-safe status
     status = dev["status"]
-    if dev.get("explicit_offline") or silent_for > 45.0:
+    if dev.get("explicit_offline") or silent_for > 120.0:
         status = "OFFLINE"
     elif silent_for > config.JAMMING_TIMEOUT_SECONDS:
         if dev.get("attack_state") == "JAM" or status in ("JAMMING", "JAMMING DETECTED"):
