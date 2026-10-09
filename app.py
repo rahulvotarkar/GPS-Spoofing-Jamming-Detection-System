@@ -795,13 +795,16 @@ def api_settings():
 
 @app.route("/api/devices/reset", methods=["POST"])
 def api_devices_reset():
-    global devices, history, sky_state, alert_history, detectors, attack_timeline, live_metrics
+    global devices, history, sky_state, alert_history, detectors, attack_timeline, live_metrics, blocked_devices, blocked_ips, attack_overrides
     devices.clear()
     detectors.clear()
     history.clear()
     sky_state.clear()
     alert_history.clear()
     attack_timeline.clear()
+    blocked_devices.clear()
+    blocked_ips.clear()
+    attack_overrides.clear()
     live_metrics = {"tp": 0, "tn": 0, "fp": 0, "fn": 0}
     raise_alert("system", "INFO", "INFO", "System state reset by administrator")
     return jsonify({"success": True})
