@@ -1306,7 +1306,7 @@
     // Auto-start location streaming on page load
     setTimeout(() => {
       if (typeof requestBrowserGPS === 'function') {
-        requestBrowserGPS();
+        requestBrowserGPS(true);
       }
     }, 500);
 
@@ -1314,8 +1314,8 @@
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (typeof pollUserDashboard === 'function') pollUserDashboard();
-        if (typeof requestBrowserGPS === 'function' && liveGpsWatchId === null && vmSimInterval === null) {
-          requestBrowserGPS();
+        if (typeof requestBrowserGPS === 'function') {
+          requestBrowserGPS(true);
         }
       }
     });
@@ -1465,13 +1465,13 @@
   let realGpsReceived = false;
   let vmSimInterval = null;
 
-  function requestBrowserGPS() {
+  function requestBrowserGPS(forceStart = false) {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser.');
       return;
     }
 
-    if (liveGpsWatchId !== null || vmSimInterval !== null) {
+    if (!forceStart && (liveGpsWatchId !== null || vmSimInterval !== null)) {
       if (liveGpsWatchId !== null) navigator.geolocation.clearWatch(liveGpsWatchId);
       if (vmSimInterval !== null) clearInterval(vmSimInterval);
       liveGpsWatchId = null;
@@ -1481,6 +1481,11 @@
       return;
     }
 
+    if (forceStart && (liveGpsWatchId !== null || vmSimInterval !== null)) {
+      return;
+    }
+
+    realGpsReceived = false;
     liveGpsWatchId = navigator.geolocation.watchPosition(pos => {
       realGpsReceived = true;
       if (vmSimInterval !== null) {
@@ -1516,8 +1521,8 @@
         if (fullLocationMap) fullLocationMap.flyTo([lat, lon], 17);
       });
     }, err => {
-      if (realGpsReceived) return; // Real GPS is active, ignore timeout errors
-      console.warn('Hardware GPS unavailable on this device, using simulated stream fallback:', err.message);
+      if (realGpsReceived) return; // Real GPS is active
+      console.warn('Hardware GPS unavailable, using simulated stream fallback:', err.message);
       
       if (vmSimInterval !== null) return;
       let simLat = 22.2951;
