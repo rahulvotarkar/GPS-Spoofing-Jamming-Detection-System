@@ -648,6 +648,8 @@ def api_user_status():
         target_id = init_id
 
     dev = devices[target_id]
+    if not dev.get("explicit_offline"):
+        dev["ts"] = now
     silent_for = now - dev["ts"]
     
     # Derive user-safe status
