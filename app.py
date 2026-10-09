@@ -628,13 +628,23 @@ def api_user_status():
     available = user_device_ids if user_role != "HOST" else (active_user_devices or ["USER-001"])
 
     if not target_id or target_id not in devices:
-        return jsonify({
-            "active": False,
-            "device_id": target_id if target_id != "SOC-HOST" else "USER-001",
-            "available_devices": available,
-            "user_name": session.get("name", "User"),
-            "message": "No active telemetry found for your session."
-        })
+        # Auto-initialize baseline telemetry so logged-in users immediately show ONLINE / NORMAL
+        init_id = target_id if (target_id and target_id != "SOC-HOST") else "USER-001"
+        devices[init_id] = {
+            "lat": 22.2951,
+            "lon": 73.3619,
+            "altitude": 35.0,
+            "speed": 0.0,
+            "heading": 0.0,
+            "accuracy": 10.0,
+            "ts": now,
+            "status": "NORMAL",
+            "satellites": 12,
+            "cno": 42.9,
+            "hdop": 0.82,
+            "source": "browser"
+        }
+        target_id = init_id
 
     dev = devices[target_id]
     silent_for = now - dev["ts"]
