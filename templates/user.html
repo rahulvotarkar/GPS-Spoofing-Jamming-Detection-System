@@ -1452,7 +1452,8 @@
     }
   }
 
-  let liveGpsWatchId = null;
+  let realGpsReceived = false;
+  let vmSimInterval = null;
 
   function requestBrowserGPS() {
     if (!navigator.geolocation) {
@@ -1460,14 +1461,23 @@
       return;
     }
 
-    if (liveGpsWatchId !== null) {
-      navigator.geolocation.clearWatch(liveGpsWatchId);
+    if (liveGpsWatchId !== null || vmSimInterval !== null) {
+      if (liveGpsWatchId !== null) navigator.geolocation.clearWatch(liveGpsWatchId);
+      if (vmSimInterval !== null) clearInterval(vmSimInterval);
       liveGpsWatchId = null;
+      vmSimInterval = null;
+      realGpsReceived = false;
       alert('Live GPS streaming stopped.');
       return;
     }
 
     liveGpsWatchId = navigator.geolocation.watchPosition(pos => {
+      realGpsReceived = true;
+      if (vmSimInterval !== null) {
+        clearInterval(vmSimInterval);
+        vmSimInterval = null;
+      }
+
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
       const accuracy = pos.coords.accuracy || 10;
@@ -1496,15 +1506,20 @@
         if (fullLocationMap) fullLocationMap.flyTo([lat, lon], 17);
       });
     }, err => {
-      console.warn('Hardware GPS unavailable, switching to VM location stream:', err.message);
-      if (typeof liveGpsWatchId === 'number' && liveGpsWatchId > 1000) return;
-
+      if (realGpsReceived) return; // Real GPS is active, ignore timeout errors
+      console.warn('Hardware GPS unavailable on this device, using simulated stream fallback:', err.message);
+      
+      if (vmSimInterval !== null) return;
       let simLat = 22.2951;
       let simLon = 73.3619;
       let angle = 0;
-      liveGpsWatchId = setInterval(() => {
+      vmSimInterval = setInterval(() => {
+        if (realGpsReceived) {
+          clearInterval(vmSimInterval);
+          vmSimInterval = null;
+          return;
+        }
         angle += 0.05;
-        // Smooth linear trajectory at ~18 km/h
         const dLat = Math.cos(angle) * 0.00008;
         const dLon = Math.sin(angle) * 0.00008;
         simLat += dLat;
@@ -1530,10 +1545,7 @@
           pollUserDashboard();
         });
       }, 1000);
-      alert('📡 Hardware GPS unavailable on VM. Dynamic Virtual Movement Stream activated! Telemetry is now streaming live movement to the Dashboard.');
-    }, { enableHighAccuracy: false, maximumAge: 3000, timeout: 5000 });
-
-    alert('📡 Live GPS streaming activated! Your real-time location is now streaming to the Dashboard.');
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 });
   }
 
   function toggleTechDetails() {
