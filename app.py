@@ -630,20 +630,21 @@ def api_user_status():
     if not target_id or target_id not in devices:
         # Auto-initialize baseline telemetry so logged-in users immediately show ONLINE / NORMAL
         init_id = target_id if (target_id and target_id != "SOC-HOST") else "USER-001"
-        devices[init_id] = {
-            "lat": 22.2951,
-            "lon": 73.3619,
-            "altitude": 35.0,
-            "speed": 0.0,
-            "heading": 0.0,
-            "accuracy": 10.0,
-            "ts": now,
-            "status": "NORMAL",
-            "satellites": 12,
-            "cno": 42.9,
-            "hdop": 0.82,
-            "source": "browser"
-        }
+        if init_id not in detectors:
+            detectors[init_id] = SingleDeviceDetector(init_id)
+        
+        state, _ = detectors[init_id].update(22.2951, 73.3619, 35.0, 0.0, 0.0, 10.0, now, "NORMAL", None, now)
+        state["ip"] = request.remote_addr
+        state["source"] = "browser"
+        devices[init_id] = state
+        sky_state[init_id] = detectors[init_id].sky_state
+        history.setdefault(init_id, deque(maxlen=config.HISTORY_LENGTH)).append({
+            "t": datetime.utcnow().strftime("%H:%M:%S"),
+            "snr": state["snr"],
+            "cno": state["cno"],
+            "satellites": state["satellites"],
+            "anomaly_score": state["anomaly_score"],
+        })
         target_id = init_id
 
     dev = devices[target_id]
