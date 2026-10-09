@@ -1302,6 +1302,13 @@
       if (overviewMap) overviewMap.invalidateSize();
       if (fullLocationMap) fullLocationMap.invalidateSize();
     }, 250);
+
+    // Auto-start location streaming on page load
+    setTimeout(() => {
+      if (typeof requestBrowserGPS === 'function') {
+        requestBrowserGPS();
+      }
+    }, 500);
   });
 
   let mapTileLayers = { ov: {}, loc: {} };
