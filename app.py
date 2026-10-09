@@ -926,12 +926,19 @@ def api_attacker_command():
 
     target_id = payload.get("device_id") or payload.get("target_device_id") or "device_B"
     cmd = str(payload.get("cmd", "normal")).upper()
-    
     attacker_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
 
+    # Collect target candidates to ensure Kali attack reaches active user streaming sessions
+    target_ids = [target_id, "USER-001", "device_B"]
+    for d_k in list(devices.keys()):
+        if d_k != "SOC-HOST" and d_k not in target_ids:
+            target_ids.append(d_k)
+
     if cmd == "NORMAL":
-        if target_id in attack_overrides:
-            del attack_overrides[target_id]
+        for t_id in target_ids:
+            if t_id in attack_overrides:
+                del attack_overrides[t_id]
+        
         victim_ip = device_registry.get(target_id)
         if victim_ip:
             def send_recovery():
@@ -941,16 +948,18 @@ def api_attacker_command():
                     pass
             threading.Thread(target=send_recovery, daemon=True).start()
     else:
-        attack_overrides[target_id] = {
-            "cmd": cmd,
-            "lat": payload.get("lat"),
-            "lon": payload.get("lon"),
-            "altitude": payload.get("altitude"),
-            "speed": payload.get("speed"),
-            "heading": payload.get("heading"),
-            "accuracy": payload.get("accuracy"),
-            "attacker_ip": attacker_ip
-        }
+        for t_id in target_ids:
+            attack_overrides[t_id] = {
+                "cmd": cmd,
+                "lat": payload.get("lat"),
+                "lon": payload.get("lon"),
+                "altitude": payload.get("altitude"),
+                "speed": payload.get("speed"),
+                "heading": payload.get("heading"),
+                "accuracy": payload.get("accuracy"),
+                "attacker_ip": attacker_ip
+            }
+        
         victim_ip = device_registry.get(target_id)
         if victim_ip:
             def forward_attack():
