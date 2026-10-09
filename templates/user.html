@@ -1494,9 +1494,16 @@
 
       let simLat = 22.2951;
       let simLon = 73.3619;
+      let angle = 0;
       liveGpsWatchId = setInterval(() => {
-        simLat += (Math.random() - 0.5) * 0.00002;
-        simLon += (Math.random() - 0.5) * 0.00002;
+        angle += 0.05;
+        // Smooth linear trajectory at ~18 km/h
+        const dLat = Math.cos(angle) * 0.00008;
+        const dLon = Math.sin(angle) * 0.00008;
+        simLat += dLat;
+        simLon += dLon;
+        const calcSpeed = 18.5 + (Math.random() * 3.0);
+        const calcHeading = Math.round(((Math.atan2(dLon, dLat) * 180 / Math.PI) + 360) % 360);
         const streamDeviceId = (selectedDevice && selectedDevice !== 'SOC-HOST') ? selectedDevice : ('{{ session.get("device_id", "USER-001") }}' !== 'SOC-HOST' ? '{{ session.get("device_id", "USER-001") }}' : 'USER-001');
 
         fetch('/update', {
@@ -1506,17 +1513,17 @@
             device_id: streamDeviceId,
             latitude: simLat,
             longitude: simLon,
-            accuracy: 15,
-            speed_kmh: 0,
-            heading: 0,
-            altitude: 35,
+            accuracy: 12,
+            speed_kmh: calcSpeed,
+            heading: calcHeading,
+            altitude: 36,
             source: 'browser_vm'
           })
         }).then(() => {
           pollUserDashboard();
         });
       }, 1000);
-      alert('📡 Hardware GPS unavailable on VM. Virtual Location Stream activated! Real-time telemetry is now streaming to the Dashboard.');
+      alert('📡 Hardware GPS unavailable on VM. Dynamic Virtual Movement Stream activated! Telemetry is now streaming live movement to the Dashboard.');
     }, { enableHighAccuracy: false, maximumAge: 3000, timeout: 5000 });
 
     alert('📡 Live GPS streaming activated! Your real-time location is now streaming to the Dashboard.');
